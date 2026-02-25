@@ -1,0 +1,77 @@
+<header class="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-slate-200">
+  <% const _app = (typeof app !== 'undefined' && app) ? app : { name: 'Zando243' }; %>
+  <% const _auth = (typeof auth !== 'undefined' && auth) ? auth : { user: null }; %>
+  <% const _filters = (typeof filters !== 'undefined' && filters) ? filters : {}; %>
+  <% const _csrf = (typeof csrfToken !== 'undefined' && csrfToken) ? csrfToken : ''; %>
+  <div class="container-max mx-auto px-4 py-3 flex items-center gap-3 justify-between">
+    <a href="/" class="flex items-center gap-2 font-extrabold text-lg md:text-xl text-slate-900 min-w-0">
+      <span class="w-8 h-8 rounded-lg bg-blue-600 text-white grid place-items-center">Z</span>
+      <span class="truncate"><%= _app.name %></span>
+    </a>
+    <form action="/search" method="GET" class="hidden md:flex flex-1 max-w-xl">
+      <input class="form-input" type="search" name="q" placeholder="Rechercher produit, marque..." value="<%= _filters.q || '' %>" />
+    </form>
+    <nav class="hidden md:flex items-center gap-2 text-sm">
+      <a class="btn-secondary" href="/products">Catalogue</a>
+      <a class="btn-secondary" href="/cart">Panier</a>
+      <% if (_auth.user) { %>
+        <a class="btn-secondary" href="/favorites">Favoris</a>
+        <a class="btn-secondary" href="/account/profile">Compte</a>
+        <% if (_auth.user.role === 'ADMIN') { %><a class="btn-primary" href="/admin">Admin</a><% } %>
+        <form action="/auth/logout" method="POST" class="inline">
+          <input type="hidden" name="_csrf" value="<%= _csrf %>">
+          <button class="btn-secondary" type="submit">Logout</button>
+        </form>
+      <% } else { %>
+        <a class="btn-secondary" href="/auth/login">Connexion</a>
+        <a class="btn-primary" href="/auth/register">Inscription</a>
+      <% } %>
+    </nav>
+    <div class="md:hidden flex items-center gap-2">
+      <a class="btn-secondary !px-3 !py-2 text-xs" href="/cart">Panier</a>
+      <button
+        id="mobileNavToggle"
+        type="button"
+        aria-expanded="false"
+        aria-controls="mobileNavPanel"
+        class="btn-secondary !px-3 !py-2 text-xs">
+        Menu
+      </button>
+    </div>
+  </div>
+  <div class="md:hidden px-4 pb-3">
+    <form action="/search" method="GET"><input class="form-input" type="search" name="q" placeholder="Rechercher..." value="<%= _filters.q || '' %>"></form>
+  </div>
+  <div id="mobileNavPanel" class="md:hidden hidden border-t border-slate-200 bg-white">
+    <div class="px-4 py-3 grid gap-2 text-sm">
+      <a class="btn-secondary text-center" href="/products">Catalogue</a>
+      <% if (_auth.user) { %>
+        <a class="btn-secondary text-center" href="/favorites">Favoris</a>
+        <a class="btn-secondary text-center" href="/account/profile">Compte</a>
+        <a class="btn-secondary text-center" href="/orders">Commandes</a>
+        <a class="btn-secondary text-center" href="/tickets">Support</a>
+        <% if (_auth.user.role === 'ADMIN') { %><a class="btn-primary text-center" href="/admin">Admin</a><% } %>
+        <form action="/auth/logout" method="POST">
+          <input type="hidden" name="_csrf" value="<%= _csrf %>">
+          <button class="btn-secondary w-full" type="submit">Logout</button>
+        </form>
+      <% } else { %>
+        <a class="btn-secondary text-center" href="/auth/login">Connexion</a>
+        <a class="btn-primary text-center" href="/auth/register">Inscription</a>
+      <% } %>
+    </div>
+  </div>
+</header>
+<script>
+  (function () {
+    const btn = document.getElementById('mobileNavToggle');
+    const panel = document.getElementById('mobileNavPanel');
+    if (!btn || !panel) return;
+    btn.addEventListener('click', () => {
+      const isHidden = panel.classList.contains('hidden');
+      panel.classList.toggle('hidden');
+      btn.setAttribute('aria-expanded', String(isHidden));
+      btn.textContent = isHidden ? 'Fermer' : 'Menu';
+    });
+  })();
+</script>

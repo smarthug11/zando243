@@ -1,0 +1,13 @@
+<%- include('../../partials/head', { title }) %><%- include('../../partials/navbar') %><%- include('../../partials/flash') %>
+<main class="container-max mx-auto px-4 py-6 grid lg:grid-cols-[240px_1fr] gap-6"><%- include('../../partials/admin-nav') %>
+<section class="card p-5 table-shell overflow-auto">
+  <h1 class="text-2xl font-extrabold mb-4">Modération des avis</h1>
+  <table><thead><tr><th>Produit</th><th>User</th><th>Note</th><th>Commentaire</th><th>État</th><th>Actions</th></tr></thead><tbody>
+    <% reviews.forEach(r => { %>
+      <tr>
+        <td><%= r.product?.name || r.productId %></td><td><%= r.user ? `${r.user.firstName} ${r.user.lastName}` : r.userId %></td><td><%= r.rating %></td><td><%= r.comment %></td><td><%= r.isHidden ? 'Caché' : 'Visible' %></td>
+        <td><form action="/admin/reviews/<%= r.id %>/moderation" method="POST" class="flex gap-2"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button class="btn-secondary" name="action" value="hide">Hide</button><button class="btn-secondary" name="action" value="unhide">Unhide</button><button class="btn-secondary" name="action" value="delete">Delete</button></form></td>
+      </tr>
+    <% }) %>
+  </tbody></table>
+</section></main><%- include('../../partials/footer') %>

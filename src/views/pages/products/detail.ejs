@@ -1,0 +1,176 @@
+<%- include('../../partials/head', { title: product.name, metaDescription: product.description?.slice(0,150) }) %>
+<%- include('../../partials/navbar') %>
+<%- include('../../partials/flash') %>
+<main class="container-max mx-auto px-4 py-6 space-y-8">
+  <% const allImages = (product.images||[]); const mainImg=(allImages.find(i=>i.isMain)||allImages[0]); %>
+  <section class="grid lg:grid-cols-2 gap-6">
+    <div class="card p-3">
+      <img id="productMainImage" class="w-full aspect-[4/3] object-cover rounded-xl bg-slate-100" src="<%= mainImg?.url || 'https://via.placeholder.com/900x700' %>" alt="">
+      <div id="productThumbs" class="grid grid-cols-4 gap-2 mt-3">
+        <% allImages.forEach((img, idx)=> { %>
+          <button
+            type="button"
+            class="thumb-btn aspect-square rounded-lg overflow-hidden border <%= idx===0 ? 'border-blue-500' : 'border-slate-200' %>"
+            data-image-url="<%= img.url %>"
+            data-variant-id="<%= img.variantId || '' %>">
+            <img class="w-full h-full object-cover bg-slate-100" src="<%= img.url %>" alt="">
+          </button>
+        <% }) %>
+      </div>
+    </div>
+    <div class="card p-5">
+      <div class="text-sm text-slate-500 mb-1"><%= product.Category?.name || '' %> • <%= product.brand || 'Sans marque' %></div>
+      <h1 class="text-2xl font-extrabold"><%= product.name %></h1>
+      <div class="mt-1 flex items-center gap-2 text-sm text-amber-600">
+        <span>
+          <% const avg = Number(product.avgRating || 0); for (let s = 1; s <= 5; s++) { %>
+            <%= s <= Math.round(avg) ? '★' : '☆' %>
+          <% } %>
+        </span>
+        <span class="text-slate-700"><%= product.avgRating %> (<%= product.countReviews %> avis)</span>
+      </div>
+      <div class="mt-4 space-y-1">
+        <div class="text-sm text-slate-500">Prix sans livraison: $<%= product.priceWithoutDelivery %></div>
+        <div class="text-sm text-slate-500">Poids: <%= product.weightKg %> kg</div>
+        <div class="text-2xl text-blue-700 font-extrabold">Prix affiché (avec formule): $<%= product.finalPrice %></div>
+      </div>
+      <p class="mt-4 text-sm text-slate-700 whitespace-pre-line"><%= product.description %></p>
+      <% if ((product.variants||[]).length) { %>
+        <div class="mt-4">
+          <div class="font-semibold mb-2">Variantes</div>
+          <div id="variantSelector" class="flex flex-wrap gap-2 text-xs">
+            <button type="button" class="variant-chip px-2 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200" data-variant-id="">Toutes / Général</button>
+            <% product.variants.forEach(v => { %>
+              <button type="button" class="variant-chip px-2 py-1 rounded-full bg-slate-100 border border-slate-200" data-variant-id="<%= v.id %>">
+                <%= v.name %><%= v.color ? ` • ${v.color}` : '' %><%= v.size ? ` • ${v.size}` : '' %> (Stock <%= v.stock %>)
+              </button>
+            <% }) %>
+          </div>
+        </div>
+      <% } %>
+      <div class="mt-5 flex flex-wrap gap-3">
+        <form action="/cart/items" method="POST" class="flex gap-2">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <input type="hidden" name="productId" value="<%= product.id %>">
+          <input type="hidden" id="selectedVariantIdInput" name="variantId" value="">
+          <input class="form-input w-24" type="number" name="qty" min="1" value="1">
+          <button class="btn-primary" type="submit">Ajouter au panier</button>
+        </form>
+        <% if (auth.user) { %>
+        <form action="/favorites/<%= product.id %>" method="POST">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <button class="btn-secondary" type="submit">Favoris</button>
+        </form>
+        <% } %>
+      </div>
+    </div>
+  </section>
+  <section class="grid lg:grid-cols-2 gap-6">
+    <div class="card p-5" id="reviews">
+      <h2 class="font-bold mb-3">Avis clients</h2>
+      <% if (auth.user) { %>
+        <form action="/products/<%= product.slug %>/reviews" method="POST" class="border rounded-xl p-4 mb-4 space-y-3">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <div>
+            <div class="text-sm font-medium mb-2">Votre note</div>
+            <div class="flex flex-wrap gap-3 text-amber-500">
+              <% for (let star = 5; star >= 1; star--) { %>
+                <label class="inline-flex items-center gap-1 cursor-pointer">
+                  <input type="radio" name="rating" value="<%= star %>" <%= star === 5 ? 'checked' : '' %>>
+                  <span><%= '★'.repeat(star) %></span>
+                </label>
+              <% } %>
+            </div>
+          </div>
+          <textarea class="form-textarea" name="comment" rows="3" placeholder="Partagez votre expérience (optionnel)"></textarea>
+          <button class="btn-primary" type="submit">Publier mon avis</button>
+        </form>
+      <% } else { %>
+        <div class="border rounded-xl p-4 mb-4 text-sm text-slate-600">
+          Connectez-vous pour laisser un avis et une note.
+          <a href="/auth/login" class="text-blue-700 font-semibold">Se connecter</a>
+        </div>
+      <% } %>
+      <div class="space-y-3">
+        <% (product.reviews||[]).slice(0,8).forEach(r => { %>
+          <div class="border rounded-xl p-3">
+            <div class="text-sm font-semibold"><%= r.user ? `${r.user.firstName} ${r.user.lastName}` : 'Utilisateur' %></div>
+            <div class="text-xs text-amber-600">
+              <% for (let s = 1; s <= 5; s++) { %><%= s <= Number(r.rating) ? '★' : '☆' %><% } %>
+              <%= r.verifiedPurchase ? ' • Achat vérifié' : '' %>
+            </div>
+            <p class="text-sm mt-1"><%= r.comment %></p>
+          </div>
+        <% }) %>
+        <% if (!(product.reviews||[]).length) { %><p class="text-sm text-slate-500">Aucun avis.</p><% } %>
+      </div>
+    </div>
+    <div class="card p-5">
+      <h2 class="font-bold mb-3">Produits similaires</h2>
+      <div class="space-y-3">
+        <% (similar||[]).slice(0,4).forEach(p => { const i=(p.images||[]).find(x=>x.isMain)||(p.images||[])[0]; %>
+          <a href="/products/<%= p.slug %>" class="flex gap-3 items-center">
+            <img class="w-16 h-16 rounded-lg object-cover bg-slate-100" src="<%= i?.url || 'https://via.placeholder.com/200' %>" alt="">
+            <div>
+              <div class="text-sm font-medium line-clamp-1"><%= p.name %></div>
+              <div class="text-xs text-blue-700 font-semibold">$<%= p.finalPrice %></div>
+            </div>
+          </a>
+        <% }) %>
+      </div>
+    </div>
+  </section>
+</main>
+<script>
+  (function () {
+    const mainImg = document.getElementById('productMainImage');
+    const thumbsWrap = document.getElementById('productThumbs');
+    const selector = document.getElementById('variantSelector');
+    const variantInput = document.getElementById('selectedVariantIdInput');
+    if (!mainImg || !thumbsWrap) return;
+
+    const thumbs = Array.from(thumbsWrap.querySelectorAll('.thumb-btn'));
+    const chips = selector ? Array.from(selector.querySelectorAll('.variant-chip')) : [];
+
+    function setActiveThumb(btn) {
+      thumbs.forEach(t => t.classList.remove('border-blue-500'));
+      thumbs.forEach(t => t.classList.add('border-slate-200'));
+      if (!btn) return;
+      btn.classList.remove('border-slate-200');
+      btn.classList.add('border-blue-500');
+      mainImg.src = btn.dataset.imageUrl;
+    }
+
+    function visibleThumbsForVariant(variantId) {
+      return thumbs.filter(t => {
+        const imgVariant = t.dataset.variantId || '';
+        if (!variantId) return true;
+        return imgVariant === '' || imgVariant === variantId;
+      });
+    }
+
+    function applyVariantFilter(variantId) {
+      if (variantInput) variantInput.value = variantId || '';
+      chips.forEach(c => {
+        const active = (c.dataset.variantId || '') === (variantId || '');
+        c.classList.toggle('bg-blue-50', active);
+        c.classList.toggle('text-blue-700', active);
+        c.classList.toggle('border-blue-200', active);
+        c.classList.toggle('bg-slate-100', !active);
+        c.classList.toggle('border-slate-200', !active);
+      });
+
+      const visible = visibleThumbsForVariant(variantId || '');
+      thumbs.forEach(t => {
+        t.style.display = visible.includes(t) ? '' : 'none';
+      });
+      setActiveThumb(visible[0] || thumbs[0] || null);
+    }
+
+    thumbs.forEach(btn => btn.addEventListener('click', () => setActiveThumb(btn)));
+    chips.forEach(chip => chip.addEventListener('click', () => applyVariantFilter(chip.dataset.variantId || '')));
+    if (chips.length) applyVariantFilter('');
+    else if (thumbs.length) setActiveThumb(thumbs[0]);
+  })();
+</script>
+<%- include('../../partials/footer') %>

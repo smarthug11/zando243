@@ -1,0 +1,71 @@
+<%- include('../../partials/head', { title, metaDescription: 'Liste des produits' }) %>
+<%- include('../../partials/navbar') %>
+<%- include('../../partials/flash') %>
+<main class="container-max mx-auto px-4 py-6 grid lg:grid-cols-[280px_1fr] gap-6">
+  <aside class="card p-4 h-fit">
+    <h2 class="font-bold mb-3">Filtres</h2>
+    <form method="GET" action="<%= currentPath === '/search' ? '/search' : '/products' %>" class="space-y-3">
+      <input class="form-input" name="q" placeholder="Recherche" value="<%= filters?.q || '' %>">
+      <select class="form-select" name="category">
+        <option value="">Toutes catégories</option>
+        <% (categories||[]).forEach(cat => { %>
+          <option value="<%= cat.slug %>" <%= filters?.category === cat.slug ? 'selected' : '' %>><%= cat.name %></option>
+        <% }) %>
+      </select>
+      <div class="grid grid-cols-2 gap-2">
+        <input class="form-input" type="number" step="0.01" name="min" placeholder="Min" value="<%= filters?.min || '' %>">
+        <input class="form-input" type="number" step="0.01" name="max" placeholder="Max" value="<%= filters?.max || '' %>">
+      </div>
+      <select class="form-select" name="rating">
+        <option value="">Note min</option>
+        <option value="4" <%= filters?.rating==='4'?'selected':'' %>>4+</option>
+        <option value="3" <%= filters?.rating==='3'?'selected':'' %>>3+</option>
+      </select>
+      <select class="form-select" name="sort">
+        <option value="popular">Popularité</option>
+        <option value="newest" <%= filters?.sort==='newest'?'selected':'' %>>Nouveauté</option>
+        <option value="price_asc" <%= filters?.sort==='price_asc'?'selected':'' %>>Prix ↑</option>
+        <option value="price_desc" <%= filters?.sort==='price_desc'?'selected':'' %>>Prix ↓</option>
+      </select>
+      <button class="btn-primary w-full" type="submit">Appliquer</button>
+    </form>
+  </aside>
+  <section>
+    <div class="flex items-center justify-between mb-4">
+      <h1 class="text-2xl font-extrabold"><%= title %></h1>
+      <span class="text-sm text-slate-500"><%= pageMeta.count %> résultats</span>
+    </div>
+    <div class="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
+      <% products.forEach(product => { const mainImg=(product.images||[]).find(i=>i.isMain)||(product.images||[])[0]; %>
+        <div class="card overflow-hidden">
+          <a href="/products/<%= product.slug %>">
+            <img class="w-full aspect-[4/3] object-cover bg-slate-100" src="<%= mainImg?.url || 'https://via.placeholder.com/600x400' %>" alt="">
+          </a>
+          <div class="p-3">
+            <a class="font-semibold line-clamp-2" href="/products/<%= product.slug %>"><%= product.name %></a>
+            <div class="text-xs text-slate-500"><%= product.Category?.name || '' %> • <%= product.brand || 'N/A' %></div>
+            <div class="text-xs text-amber-600 mt-1">★ <%= product.avgRating %> (<%= product.countReviews %>)</div>
+            <div class="mt-2 flex items-center justify-between">
+              <div>
+                <div class="text-blue-700 font-bold">$<%= product.finalPrice %></div>
+                <div class="text-xs text-slate-500">Prix base: $<%= product.priceWithoutDelivery %></div>
+              </div>
+              <form action="/cart/items" method="POST">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <input type="hidden" name="productId" value="<%= product.id %>">
+                <input type="hidden" name="qty" value="1">
+                <button class="btn-primary text-sm" type="submit">Ajouter</button>
+              </form>
+            </div>
+          </div>
+        </div>
+      <% }) %>
+    </div>
+    <div class="mt-6 flex justify-center gap-2">
+      <% if (pageMeta.hasPrev) { %><a class="btn-secondary" href="?<%= new URLSearchParams({ ...filters, page: pageMeta.page - 1 }).toString() %>">Préc.</a><% } %>
+      <span class="px-3 py-2">Page <%= pageMeta.page %>/<%= pageMeta.totalPages %></span>
+      <% if (pageMeta.hasNext) { %><a class="btn-secondary" href="?<%= new URLSearchParams({ ...filters, page: pageMeta.page + 1 }).toString() %>">Suiv.</a><% } %>
+    </div>
+  </section>
+</main>
+<%- include('../../partials/footer') %>

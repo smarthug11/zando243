@@ -1,0 +1,12 @@
+<%
+  const rawStatus = (typeof status !== 'undefined' && status) ? String(status) : '';
+  const normalized = rawStatus.toUpperCase();
+  const key = normalized === 'PROCESSING' ? 'processing'
+    : normalized === 'SHIPPED' ? 'shipped'
+    : normalized === 'DELIVERED' ? 'delivered'
+    : normalized === 'CANCELLED' ? 'cancelled'
+    : normalized === 'REFUNDED' ? 'refunded'
+    : 'default';
+  const label = rawStatus || '-';
+%>
+<span class="status-badge status-<%= key %>"><%= label %></span>

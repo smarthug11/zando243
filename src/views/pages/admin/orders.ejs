@@ -1,0 +1,67 @@
+﻿<%- include('../../partials/head', { title }) %><%- include('../../partials/navbar') %><%- include('../../partials/flash') %>
+<main class="container-max mx-auto px-4 py-6 grid lg:grid-cols-[240px_1fr] gap-6"><%- include('../../partials/admin-nav') %>
+<section class="space-y-6">
+  <div class="card p-5">
+    <h1 class="text-2xl font-extrabold mb-4">Gestion commandes</h1>
+    <div class="mb-4 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+      <span class="font-semibold">Légende tracking:</span>
+      <span class="ml-2"><code class="font-semibold">ITS-D</code> = Livraison à la porte</span>
+      <span class="ml-3"><code class="font-semibold">ITS-R</code> = Retrait bureau</span>
+    </div>
+    <form method="GET" action="/admin/orders" class="grid xl:grid-cols-[1.4fr_1fr_1fr_1fr_auto_auto] gap-2 items-end">
+      <div>
+        <label class="text-xs text-slate-500 block mb-1">Recherche client</label>
+        <input class="form-input" type="search" name="q" value="<%= filters?.q || '' %>" placeholder="Nom, prénom ou email">
+      </div>
+      <div>
+        <label class="text-xs text-slate-500 block mb-1">Statut</label>
+        <select class="form-select" name="status">
+          <option value="">Tous</option>
+          <% ['Processing','Shipped','Delivered','Cancelled','Refunded'].forEach(s => { %>
+            <option value="<%= s %>" <%= filters?.status === s ? 'selected' : '' %>><%= s %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div>
+        <label class="text-xs text-slate-500 block mb-1">Date début</label>
+        <input class="form-input" type="date" name="startDate" value="<%= filters?.startDate || '' %>">
+      </div>
+      <div>
+        <label class="text-xs text-slate-500 block mb-1">Date fin</label>
+        <input class="form-input" type="date" name="endDate" value="<%= filters?.endDate || '' %>">
+      </div>
+      <button class="btn-primary" type="submit">Filtrer</button>
+      <a class="btn-secondary text-center" href="/admin/orders">Réinitialiser</a>
+    </form>
+  </div>
+
+  <div class="card p-5 table-shell overflow-auto">
+    <table>
+      <thead><tr><th>Date</th><th>N°</th><th>Client</th><th>Statut</th><th>Paiement</th><th>Frais poids (15$/kg)</th><th>Total</th><th>Tracking</th><th>Action</th></tr></thead>
+      <tbody>
+      <% orders.forEach(o => { %>
+        <% const weightFee = Number(((o.items||[]).reduce((s,it)=>{ const snap=(typeof it.productSnapshot==='string'?JSON.parse(it.productSnapshot):it.productSnapshot)||{}; return s + 15 * Number(snap.weightKg||0) * Number(it.qty||0); },0)).toFixed(2)); %>
+        <tr class="hover:bg-slate-50">
+          <td><%= new Date(o.createdAt).toLocaleDateString('fr-FR') %></td>
+          <td><a class="text-blue-700 font-semibold" href="/admin/orders/<%= o.id %>"><%= o.orderNumber %></a></td>
+          <td><%= o.User ? `${o.User.firstName} ${o.User.lastName}` : o.userId %></td>
+          <td><%- include('../../partials/status-badge', { status: o.status }) %></td>
+          <td><%= o.paymentMethod %></td>
+          <td>$<%= weightFee.toFixed(2) %></td>
+          <td>$<%= o.total %></td>
+          <td><%= o.trackingNumber || '-' %></td>
+          <td>
+            <form action="/admin/orders/<%= o.id %>/status" method="POST" class="grid gap-1">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <select class="form-select" name="status"><% ['Processing','Shipped','Delivered','Cancelled','Refunded'].forEach(s => { %><option value="<%= s %>" <%= o.status===s?'selected':'' %>><%= s %></option><% }) %></select>
+              <input class="form-input" name="note" placeholder="Note interne">
+              <button class="btn-secondary">Mettre à jour</button>
+            </form>
+          </td>
+        </tr>
+      <% }) %>
+      </tbody>
+    </table>
+    <% if (!orders.length) { %><div class="text-sm text-slate-500 mt-4">Aucune commande pour ces filtres.</div><% } %>
+  </div>
+</section></main><%- include('../../partials/footer') %>

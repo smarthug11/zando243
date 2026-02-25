@@ -1,0 +1,8 @@
+<% const _flash = (typeof flash !== 'undefined') ? flash : null; %>
+<% if (_flash) { %>
+  <div class="container-max mx-auto px-4 mt-4">
+    <div class="rounded-xl px-4 py-3 <%= _flash.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200' %>">
+      <%= _flash.message %>
+    </div>
+  </div>
+<% } %>

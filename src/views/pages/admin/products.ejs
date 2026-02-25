@@ -1,0 +1,236 @@
+﻿<%- include('../../partials/head', { title }) %><%- include('../../partials/navbar') %><%- include('../../partials/flash') %>
+<main class="container-max mx-auto px-4 py-6 grid lg:grid-cols-[240px_1fr] gap-6"><%- include('../../partials/admin-nav') %>
+<section class="space-y-6">
+  <h1 class="text-2xl font-extrabold">Gestion catalogue / produits</h1>
+
+  <div class="card p-5">
+    <h2 class="font-bold mb-3">Ajouter un produit</h2>
+    <form action="/admin/products" method="POST" class="grid md:grid-cols-3 gap-2">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <input class="form-input" name="name" placeholder="Nom" required>
+      <select class="form-select" name="categoryId" required><% categories.forEach(c=> { %><option value="<%= c.id %>"><%= c.name %></option><% }) %></select>
+      <input class="form-input" name="brand" placeholder="Marque">
+      <input class="form-input" name="sku" placeholder="SKU" required>
+      <input class="form-input" type="number" step="0.01" name="purchasePrice" placeholder="Prix achat" value="0">
+      <input class="form-input" type="number" step="0.01" name="priceWithoutDelivery" placeholder="Prix sans livraison" required>
+      <input class="form-input" type="number" step="0.01" name="weightKg" placeholder="Poids kg" required>
+      <input class="form-input" type="number" name="stock" placeholder="Stock" required>
+      <input class="form-input" name="imageUrl" placeholder="Image URL">
+      <select class="form-select" name="status"><option>ACTIVE</option><option>DRAFT</option></select>
+      <input class="form-input md:col-span-3" name="keywords" placeholder="keywords séparés par virgules">
+      <textarea class="form-textarea md:col-span-3" name="description" rows="3" placeholder="Description"></textarea>
+      <button class="btn-primary md:col-span-3" type="submit">Créer produit</button>
+    </form>
+  </div>
+
+  <div class="card p-5 table-shell overflow-auto">
+    <div class="flex flex-wrap items-end gap-2 mb-4">
+      <form action="/admin/products" method="GET" class="flex flex-wrap items-end gap-2 w-full">
+        <div>
+          <label class="text-xs text-slate-500 block mb-1">Recherche produit</label>
+          <input class="form-input min-w-[260px]" type="search" name="q" value="<%= filters?.q || '' %>" placeholder="Nom, SKU ou marque">
+        </div>
+        <div>
+          <label class="text-xs text-slate-500 block mb-1">Catégorie</label>
+          <select class="form-select min-w-[220px]" name="categoryId">
+            <option value="">Toutes</option>
+            <% categories.forEach(c => { %>
+              <option value="<%= c.id %>" <%= filters?.categoryId === String(c.id) ? 'selected' : '' %>><%= c.name %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs text-slate-500 block mb-1">Stock ≤</label>
+          <input class="form-input w-32" type="number" min="0" name="stockLte" value="<%= filters?.stockLte || '' %>" placeholder="ex: 10">
+        </div>
+        <button class="btn-primary" type="submit">Filtrer</button>
+        <a class="btn-secondary" href="/admin/products">Réinitialiser</a>
+      </form>
+    </div>
+    <table>
+      <thead><tr><th>Nom</th><th>SKU</th><th>Prix</th><th>Stock</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody>
+      <% products.forEach((p, idx) => { const modalId = `product-modal-${idx}`; %>
+        <% const imgs = Array.isArray(p.images) ? p.images : []; const vars = Array.isArray(p.variants) ? p.variants : []; const mainImg = imgs.find(i => i.isMain) || imgs[0]; %>
+        <tr>
+          <td>
+            <div class="flex items-center gap-3 min-w-[260px]">
+              <img class="w-10 h-10 rounded-lg object-cover bg-slate-100 border border-slate-200" src="<%= mainImg?.url || 'https://via.placeholder.com/80x80?text=P' %>" alt="">
+              <div>
+                <div class="font-medium leading-tight"><%= p.name %></div>
+                <div class="text-xs text-slate-500"><%= p.Category?.name || 'Sans catégorie' %></div>
+              </div>
+            </div>
+          </td>
+          <td><%= p.sku %></td>
+          <td>$<%= p.priceWithoutDelivery %></td>
+          <td>
+            <span class="<%= Number(p.stock) <= 10 ? 'text-red-600 font-bold' : '' %>"><%= p.stock %></span>
+          </td>
+          <td><span class="px-2 py-1 rounded-full text-xs font-semibold <%= p.status === 'ACTIVE' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-700 border border-slate-200' %>"><%= p.status %></span></td>
+          <td>
+            <button type="button" class="btn-secondary product-modal-open" data-target="<%= modalId %>">Modifier / Supprimer</button>
+
+            <dialog id="<%= modalId %>" class="product-modal rounded-2xl p-0 border border-slate-200 shadow-2xl w-[min(860px,95vw)] backdrop:bg-slate-900/40">
+              <div class="p-5 border-b border-slate-200 flex items-center justify-between gap-3 bg-white sticky top-0">
+                <div>
+                  <h3 class="font-bold text-lg">Éditer le produit</h3>
+                  <div class="text-xs text-slate-500"><%= p.name %> • <%= p.sku %></div>
+                </div>
+                <button type="button" class="btn-secondary product-modal-close" data-target="<%= modalId %>">Fermer</button>
+              </div>
+
+              <div class="p-5 bg-white">
+                <form action="/admin/products/<%= p.id %>" method="POST" class="grid md:grid-cols-3 gap-2">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <input class="form-input" name="name" value="<%= p.name %>" placeholder="Nom" required>
+                  <select class="form-select" name="categoryId" required>
+                    <% categories.forEach(c=> { %>
+                      <option value="<%= c.id %>" <%= String(c.id) === String(p.categoryId) ? 'selected' : '' %>><%= c.name %></option>
+                    <% }) %>
+                  </select>
+                  <input class="form-input" name="brand" value="<%= p.brand || '' %>" placeholder="Marque">
+
+                  <input class="form-input" name="sku" value="<%= p.sku %>" placeholder="SKU" required>
+                  <input class="form-input" type="number" step="0.01" name="purchasePrice" value="<%= p.purchasePrice %>" placeholder="Prix achat">
+                  <input class="form-input" type="number" step="0.01" name="priceWithoutDelivery" value="<%= p.priceWithoutDelivery %>" placeholder="Prix sans livraison" required>
+
+                  <input class="form-input" type="number" step="0.01" name="weightKg" value="<%= p.weightKg %>" placeholder="Poids kg" required>
+                  <input class="form-input" type="number" name="stock" value="<%= p.stock %>" placeholder="Stock" required>
+                  <select class="form-select" name="status"><option value="ACTIVE" <%= p.status==='ACTIVE'?'selected':'' %>>ACTIVE</option><option value="DRAFT" <%= p.status==='DRAFT'?'selected':'' %>>DRAFT</option></select>
+
+                  <input class="form-input md:col-span-3" name="keywords" value="<%= (Array.isArray(p.keywords) ? p.keywords : (typeof p.keywords === 'string' ? JSON.parse(p.keywords || '[]') : [])).join(', ') %>" placeholder="keywords séparés par virgules">
+                  <textarea class="form-textarea md:col-span-3" name="description" rows="5" placeholder="Description"><%= p.description || '' %></textarea>
+
+                  <div class="md:col-span-3 flex flex-wrap justify-end gap-2 mt-2">
+                    <button type="button" class="btn-secondary product-modal-close" data-target="<%= modalId %>">Annuler</button>
+                    <button class="btn-primary" type="submit">Modifier</button>
+                    <button class="rounded-lg px-4 py-2 font-semibold text-white bg-red-600 hover:bg-red-700" type="submit" formaction="/admin/products/<%= p.id %>/delete" onclick="return confirm('Supprimer ce produit ?');">Supprimer</button>
+                  </div>
+                </form>
+
+                <div class="mt-6 grid xl:grid-cols-2 gap-6">
+                  <section class="border rounded-xl p-4">
+                    <div class="flex items-center justify-between mb-3">
+                      <h4 class="font-semibold">Images du produit</h4>
+                      <span class="text-xs text-slate-500"><%= imgs.length %> image(s)</span>
+                    </div>
+                    <div class="space-y-3 max-h-72 overflow-auto pr-1">
+                      <% imgs.forEach(img => { const linkedVariant = vars.find(v => String(v.id) === String(img.variantId || '')); %>
+                        <form action="/admin/products/<%= p.id %>/images/<%= img.id %>" method="POST" class="border rounded-lg p-3 space-y-2">
+                          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                          <div class="flex gap-3">
+                            <img src="<%= img.url %>" alt="" class="w-16 h-16 rounded-lg object-cover bg-slate-100 border">
+                            <div class="flex-1 grid grid-cols-1 gap-2">
+                              <input class="form-input" name="url" value="<%= img.url %>" placeholder="URL image">
+                              <div class="text-xs text-slate-500">
+                                Association: <strong><%= linkedVariant ? `${linkedVariant.name}${linkedVariant.color ? ` • ${linkedVariant.color}` : ''}${linkedVariant.size ? ` • ${linkedVariant.size}` : ''}` : 'Image générale du produit' %></strong>
+                              </div>
+                              <div class="grid grid-cols-[100px_1fr_auto_auto] gap-2 items-center">
+                                <input class="form-input" type="number" name="position" value="<%= img.position || 0 %>" placeholder="Pos.">
+                                <label class="text-sm flex items-center gap-2"><input type="checkbox" name="isMain" value="1" <%= img.isMain ? 'checked' : '' %>> Principale</label>
+                                <button class="btn-primary !py-2 !px-3 text-sm" type="submit">Modifier</button>
+                                <button class="rounded-lg px-3 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700" type="submit" formaction="/admin/products/<%= p.id %>/images/<%= img.id %>/delete" onclick="return confirm('Supprimer cette image ?');">Suppr.</button>
+                              </div>
+                              <select class="form-select" name="variantId">
+                                <option value="">Image générale (aucune variante)</option>
+                                <% vars.forEach(v => { %>
+                                  <option value="<%= v.id %>" <%= String(v.id) === String(img.variantId || '') ? 'selected' : '' %>>
+                                    <%= v.name %><%= v.color ? ` • ${v.color}` : '' %><%= v.size ? ` • ${v.size}` : '' %>
+                                  </option>
+                                <% }) %>
+                              </select>
+                            </div>
+                          </div>
+                        </form>
+                      <% }) %>
+                      <% if (!imgs.length) { %><div class="text-sm text-slate-500">Aucune image.</div><% } %>
+                    </div>
+                    <form action="/admin/products/<%= p.id %>/images" method="POST" class="mt-4 grid grid-cols-1 gap-2 border-t pt-4">
+                      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                      <input class="form-input" name="url" placeholder="Ajouter une URL image" required>
+                      <select class="form-select" name="variantId">
+                        <option value="">Image générale (aucune variante)</option>
+                        <% vars.forEach(v => { %>
+                          <option value="<%= v.id %>"><%= v.name %><%= v.color ? ` • ${v.color}` : '' %><%= v.size ? ` • ${v.size}` : '' %></option>
+                        <% }) %>
+                      </select>
+                      <div class="grid grid-cols-[100px_1fr_auto] gap-2 items-center">
+                        <input class="form-input" type="number" name="position" value="0" placeholder="Pos.">
+                        <label class="text-sm flex items-center gap-2"><input type="checkbox" name="isMain" value="1"> Définir principale</label>
+                        <button class="btn-primary !py-2 !px-3 text-sm" type="submit">Ajouter image</button>
+                      </div>
+                    </form>
+                  </section>
+
+                  <section class="border rounded-xl p-4">
+                    <div class="flex items-center justify-between mb-3">
+                      <h4 class="font-semibold">Variantes (taille / couleur)</h4>
+                      <span class="text-xs text-slate-500"><%= vars.length %> variante(s)</span>
+                    </div>
+                    <div class="space-y-3 max-h-72 overflow-auto pr-1">
+                      <% vars.forEach(v => { %>
+                        <form action="/admin/products/<%= p.id %>/variants/<%= v.id %>" method="POST" class="border rounded-lg p-3 grid grid-cols-2 gap-2">
+                          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                          <input class="form-input col-span-2" name="name" value="<%= v.name %>" placeholder="Nom variante" required>
+                          <input class="form-input" name="color" value="<%= v.color || '' %>" placeholder="Couleur">
+                          <input class="form-input" name="size" value="<%= v.size || '' %>" placeholder="Taille">
+                          <input class="form-input" name="sku" value="<%= v.sku || '' %>" placeholder="SKU variante">
+                          <input class="form-input" type="number" name="stock" value="<%= v.stock || 0 %>" placeholder="Stock">
+                          <div class="col-span-2 flex justify-end gap-2">
+                            <button class="btn-primary !py-2 !px-3 text-sm" type="submit">Modifier</button>
+                            <button class="rounded-lg px-3 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700" type="submit" formaction="/admin/products/<%= p.id %>/variants/<%= v.id %>/delete" onclick="return confirm('Supprimer cette variante ?');">Suppr.</button>
+                          </div>
+                        </form>
+                      <% }) %>
+                      <% if (!vars.length) { %><div class="text-sm text-slate-500">Aucune variante.</div><% } %>
+                    </div>
+                    <form action="/admin/products/<%= p.id %>/variants" method="POST" class="mt-4 grid grid-cols-2 gap-2 border-t pt-4">
+                      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                      <input class="form-input col-span-2" name="name" placeholder="Nom variante (ex: T-shirt Rouge M)" required>
+                      <input class="form-input" name="color" placeholder="Couleur">
+                      <input class="form-input" name="size" placeholder="Taille">
+                      <input class="form-input" name="sku" placeholder="SKU variante">
+                      <input class="form-input" type="number" name="stock" value="0" placeholder="Stock">
+                      <div class="col-span-2 flex justify-end">
+                        <button class="btn-primary !py-2 !px-3 text-sm" type="submit">Ajouter variante</button>
+                      </div>
+                    </form>
+                  </section>
+                </div>
+              </div>
+            </dialog>
+          </td>
+        </tr>
+      <% }) %>
+      </tbody>
+    </table>
+  </div>
+</section></main>
+<script>
+(function () {
+  const openers = document.querySelectorAll('.product-modal-open');
+  const closers = document.querySelectorAll('.product-modal-close');
+
+  function getDialog(id) { return document.getElementById(id); }
+
+  openers.forEach(btn => btn.addEventListener('click', () => {
+    const dialog = getDialog(btn.dataset.target);
+    if (dialog && typeof dialog.showModal === 'function') dialog.showModal();
+  }));
+
+  closers.forEach(btn => btn.addEventListener('click', () => {
+    const dialog = getDialog(btn.dataset.target);
+    if (dialog) dialog.close();
+  }));
+
+  document.querySelectorAll('dialog.product-modal').forEach(dialog => {
+    dialog.addEventListener('click', (e) => {
+      const rect = dialog.getBoundingClientRect();
+      const inside = rect.top <= e.clientY && e.clientY <= rect.top + rect.height && rect.left <= e.clientX && e.clientX <= rect.left + rect.width;
+      if (!inside) dialog.close();
+    });
+  });
+})();
+</script>
+<%- include('../../partials/footer') %>

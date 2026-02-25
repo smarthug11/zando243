@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Checkout - Mobile E-commerce</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#1969e1",
+                        "background-light": "#f6f7f8",
+                        "background-dark": "#111721",
+                    },
+                    fontFamily: {
+                        "display": ["Inter"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark font-display text-[#111418] dark:text-white">
+<div class="max-w-md mx-auto min-h-screen bg-white dark:bg-slate-900 flex flex-col relative pb-32">
+<!-- Top App Bar -->
+<div class="sticky top-0 z-10 flex items-center bg-white dark:bg-slate-900 p-4 border-b border-gray-100 dark:border-slate-800 justify-between">
+<div class="text-[#111418] dark:text-white flex size-10 shrink-0 items-center justify-center cursor-pointer">
+<span class="material-symbols-outlined">arrow_back</span>
+</div>
+<h2 class="text-[#111418] dark:text-white text-lg font-bold leading-tight tracking-[-0.015em] flex-1 text-center">My Cart</h2>
+<div class="size-10 flex items-center justify-center">
+<span class="material-symbols-outlined text-gray-400">more_vert</span>
+</div>
+</div>
+<!-- Cart Items Section -->
+<div class="px-4 pt-6">
+<div class="flex items-center justify-between mb-4">
+<h3 class="text-[#111418] dark:text-white text-lg font-bold">Items (3)</h3>
+</div>
+<!-- Item 1 -->
+<div class="flex items-start gap-4 bg-white dark:bg-slate-800 p-3 rounded-xl border border-gray-100 dark:border-slate-700 mb-3">
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-lg size-20 shrink-0 bg-gray-100" data-alt="White premium cotton t-shirt folded neatly" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCRGFY5H0t4eoAKBfmppGRQ1vxokk2QfyUBViVKCJwetYqMHSnUK3KA9pH7MGO8pqG4KcEByG8XTSeo7ItaK9c_zPu4SMDg55ko_lQI0lW3hs3pDAGgIve77l1jzedQIMRKxaXNFsywuY7qURFGVfAfdqY69dI_C9Yn3kC59ptdqOTw0lta3GZuAITF3JVpizvumtAp5wUSCozzW7CT4r8OoTp0qtFbQI8ReX_2YOv_oFciK5hYOMuit_K7HJiUdNmdN7RSSC4tW6Q");'></div>
+<div class="flex flex-col flex-1 gap-1">
+<div class="flex justify-between items-start">
+<p class="text-[#111418] dark:text-white text-base font-semibold leading-tight line-clamp-1">Premium Cotton Tee</p>
+<button class="text-gray-400 hover:text-red-500 transition-colors">
+<span class="material-symbols-outlined text-[20px]">delete</span>
+</button>
+</div>
+<p class="text-[#637288] dark:text-slate-400 text-xs font-medium">Size: M | Color: White</p>
+<div class="flex items-center justify-between mt-2">
+<p class="text-primary font-bold text-base">$32.00</p>
+<div class="flex items-center gap-3 bg-gray-50 dark:bg-slate-700 px-2 py-1 rounded-lg">
+<button class="flex h-6 w-6 items-center justify-center rounded bg-white dark:bg-slate-600 shadow-sm text-sm font-bold text-gray-600 dark:text-white">-</button>
+<span class="text-sm font-bold w-4 text-center">1</span>
+<button class="flex h-6 w-6 items-center justify-center rounded bg-white dark:bg-slate-600 shadow-sm text-sm font-bold text-gray-600 dark:text-white">+</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Item 2 -->
+<div class="flex items-start gap-4 bg-white dark:bg-slate-800 p-3 rounded-xl border border-gray-100 dark:border-slate-700 mb-3">
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-lg size-20 shrink-0 bg-gray-100" data-alt="Slim fit beige chinos pants" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDKXg5sSDoO388DoTQSXMaBd6YICOJYdMvxUrWHl4jsldPh07arkpq48vw4XZpHvFC8AfYqAhVVojAVXs33daelx4ewGvYKI4h24iZJJSIUPDRn2N8S6jvF7SHfJURbLib06LUaKl_1iPS7dGfNvx8zOsf-x_LDRtdL2twCc1JIEiDvq84XPcG_v-_Mouh0hXMzyTTUlLohSlwQheeHiPHaJLRAgTwoCMHVJWK6sKsehFbrLpGlxJeGre0T6v1kc34-sRYloILU6BI");'></div>
+<div class="flex flex-col flex-1 gap-1">
+<div class="flex justify-between items-start">
+<p class="text-[#111418] dark:text-white text-base font-semibold leading-tight line-clamp-1">Slim Fit Chinos</p>
+<button class="text-gray-400 hover:text-red-500 transition-colors">
+<span class="material-symbols-outlined text-[20px]">delete</span>
+</button>
+</div>
+<p class="text-[#637288] dark:text-slate-400 text-xs font-medium">Size: 32 | Color: Beige</p>
+<div class="flex items-center justify-between mt-2">
+<p class="text-primary font-bold text-base">$58.00</p>
+<div class="flex items-center gap-3 bg-gray-50 dark:bg-slate-700 px-2 py-1 rounded-lg">
+<button class="flex h-6 w-6 items-center justify-center rounded bg-white dark:bg-slate-600 shadow-sm text-sm font-bold text-gray-600 dark:text-white">-</button>
+<span class="text-sm font-bold w-4 text-center">1</span>
+<button class="flex h-6 w-6 items-center justify-center rounded bg-white dark:bg-slate-600 shadow-sm text-sm font-bold text-gray-600 dark:text-white">+</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Shipping & Payment Section -->
+<div class="px-4 pt-4 space-y-4">
+<!-- Shipping Address -->
+<div class="bg-white dark:bg-slate-800 p-4 rounded-xl border border-gray-100 dark:border-slate-700">
+<div class="flex items-center justify-between mb-3">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">local_shipping</span>
+<h4 class="font-bold text-sm">Shipping Address</h4>
+</div>
+<button class="text-primary text-xs font-bold uppercase tracking-wider">Change</button>
+</div>
+<div class="flex flex-col gap-1">
+<p class="text-sm font-bold text-[#111418] dark:text-white">Alex Johnson</p>
+<p class="text-xs text-[#637288] dark:text-slate-400 leading-relaxed">2401 West Coast Highway, Suite 200<br/>Newport Beach, CA 92663</p>
+</div>
+</div>
+<!-- Payment Method -->
+<div class="bg-white dark:bg-slate-800 p-4 rounded-xl border border-gray-100 dark:border-slate-700">
+<div class="flex items-center justify-between mb-3">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">payments</span>
+<h4 class="font-bold text-sm">Payment Method</h4>
+</div>
+<button class="text-primary text-xs font-bold uppercase tracking-wider">Edit</button>
+</div>
+<div class="flex items-center gap-3">
+<div class="w-10 h-6 bg-slate-100 dark:bg-slate-700 rounded flex items-center justify-center overflow-hidden border border-gray-200 dark:border-slate-600">
+<!-- Placeholder for Card Brand Logo -->
+<div class="flex gap-1">
+<div class="w-2.5 h-2.5 rounded-full bg-red-500 opacity-80"></div>
+<div class="w-2.5 h-2.5 rounded-full bg-yellow-500 opacity-80 -ml-1.5"></div>
+</div>
+</div>
+<div class="flex flex-col">
+<p class="text-sm font-bold text-[#111418] dark:text-white">Mastercard •••• 8291</p>
+<p class="text-[10px] text-[#637288] dark:text-slate-400 uppercase font-medium">Expires 12/26</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Summary Section -->
+<div class="px-4 py-6">
+<div class="bg-primary/5 dark:bg-primary/10 rounded-xl p-4 space-y-3">
+<div class="flex justify-between items-center text-sm">
+<span class="text-[#637288] dark:text-slate-300">Subtotal</span>
+<span class="font-medium">$90.00</span>
+</div>
+<div class="flex justify-between items-center text-sm">
+<span class="text-[#637288] dark:text-slate-300">Shipping</span>
+<span class="text-green-600 dark:text-green-400 font-bold">FREE</span>
+</div>
+<div class="flex justify-between items-center text-sm">
+<span class="text-[#637288] dark:text-slate-300">Estimated Tax</span>
+<span class="font-medium">$7.20</span>
+</div>
+<div class="pt-2 border-t border-primary/20 flex justify-between items-center">
+<span class="text-base font-bold text-[#111418] dark:text-white">Total</span>
+<span class="text-xl font-bold text-primary">$97.20</span>
+</div>
+</div>
+<div class="mt-4 flex items-center justify-center gap-2 text-[#637288] dark:text-slate-400">
+<span class="material-symbols-outlined text-[18px]">verified_user</span>
+<p class="text-xs font-medium">Secure SSL Checkout</p>
+</div>
+</div>
+<!-- Sticky Bottom CTA -->
+<div class="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-white dark:bg-slate-900 border-t border-gray-100 dark:border-slate-800 p-4 pb-8">
+<div class="flex items-center gap-4">
+<div class="flex flex-col">
+<p class="text-[10px] text-[#637288] dark:text-slate-400 uppercase font-bold tracking-wider">Order Total</p>
+<p class="text-lg font-bold text-[#111418] dark:text-white leading-none">$97.20</p>
+</div>
+<button class="flex-1 bg-primary text-white font-bold py-4 px-6 rounded-xl shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all flex items-center justify-center gap-2">
+                    Place Order
+                    <span class="material-symbols-outlined">arrow_forward</span>
+</button>
+</div>
+</div>
+</div>
+</body></html>

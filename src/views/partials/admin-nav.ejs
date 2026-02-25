@@ -1,0 +1,13 @@
+<aside class="card p-4 space-y-2 text-sm h-fit">
+  <% const _currentPath = (typeof currentPath !== 'undefined' && currentPath) ? currentPath : ''; %>
+  <a class="block <%= _currentPath === '/admin' ? 'font-bold text-blue-700' : '' %>" href="/admin">Dashboard</a>
+  <a class="block" href="/admin/products">Produits</a>
+  <a class="block" href="/admin/categories">Catégories</a>
+  <a class="block" href="/admin/orders">Commandes</a>
+  <a class="block" href="/admin/coupons">Coupons</a>
+  <a class="block" href="/admin/reviews">Avis</a>
+  <a class="block" href="/admin/refunds">Retours</a>
+  <a class="block" href="/admin/users">Clients</a>
+  <a class="block" href="/admin/logistics">Logistique</a>
+  <a class="block" href="/admin/logs">Logs</a>
+</aside>

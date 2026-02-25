@@ -1,0 +1,125 @@
+<%- include('../../partials/head', { title }) %><%- include('../../partials/navbar') %><%- include('../../partials/flash') %>
+<main class="container-max mx-auto px-4 py-6 grid lg:grid-cols-[240px_1fr] gap-6"><%- include('../../partials/admin-nav') %>
+<section class="space-y-6">
+  <div class="card p-5">
+    <h1 class="text-2xl font-extrabold mb-4">Logs système et métier</h1>
+    <form method="GET" action="/admin/logs" class="grid xl:grid-cols-[1fr_1fr_1.4fr_1.2fr_1fr_1fr_auto_auto] gap-2 items-end">
+      <div>
+        <label class="text-xs text-slate-500 block mb-1">Catégorie</label>
+        <select class="form-select" name="category">
+          <option value="">Toutes</option>
+          <% categories.forEach(c => { %><option value="<%= c %>" <%= filters.category===c?'selected':'' %>><%= c %></option><% }) %>
+        </select>
+      </div>
+      <div>
+        <label class="text-xs text-slate-500 block mb-1">Niveau</label>
+        <select class="form-select" name="level">
+          <option value="">Tous</option>
+          <% levels.forEach(l => { %><option value="<%= l %>" <%= filters.level===l?'selected':'' %>><%= l %></option><% }) %>
+        </select>
+      </div>
+      <div>
+        <label class="text-xs text-slate-500 block mb-1">Texte (action/message)</label>
+        <input class="form-input" type="search" name="q" value="<%= filters.q || '' %>" placeholder="order, login, produit...">
+      </div>
+      <div>
+        <label class="text-xs text-slate-500 block mb-1">Utilisateur (email)</label>
+        <input class="form-input" type="search" name="actorEmail" value="<%= filters.actorEmail || '' %>" placeholder="admin@...">
+      </div>
+      <div>
+        <label class="text-xs text-slate-500 block mb-1">Date début</label>
+        <input class="form-input" type="date" name="startDate" value="<%= filters.startDate || '' %>">
+      </div>
+      <div>
+        <label class="text-xs text-slate-500 block mb-1">Date fin</label>
+        <input class="form-input" type="date" name="endDate" value="<%= filters.endDate || '' %>">
+      </div>
+      <button class="btn-primary" type="submit">Filtrer</button>
+      <a class="btn-secondary text-center" href="/admin/logs">Reset</a>
+    </form>
+  </div>
+
+  <div class="card p-5 table-shell overflow-auto">
+    <table>
+      <thead>
+        <tr><th>Date</th><th>Catégorie</th><th>Niveau</th><th>Action</th><th>Acteur</th><th>Message</th><th>Détails</th></tr>
+      </thead>
+      <tbody>
+      <% logs.forEach((log, idx) => { let metaObj = {}; try { metaObj = (typeof log.meta === 'string' ? JSON.parse(log.meta) : log.meta) || {}; } catch(_e) { metaObj = { raw: log.meta }; } const detailId = `log-detail-${idx}`; %>
+        <tr>
+          <td><%= new Date(log.createdAt).toLocaleString('fr-FR') %></td>
+          <td><span class="px-2 py-1 rounded-full bg-slate-100 border text-xs font-semibold"><%= log.category %></span></td>
+          <td>
+            <span class="px-2 py-1 rounded-full text-xs font-semibold <%= log.level==='ERROR' ? 'bg-red-50 text-red-700 border border-red-200' : log.level==='WARN' ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-blue-50 text-blue-700 border border-blue-200' %>">
+              <%= log.level %>
+            </span>
+          </td>
+          <td><code class="text-xs"><%= log.action %></code></td>
+          <td>
+            <div class="text-sm"><%= log.actor?.email || log.actorEmail || '-' %></div>
+            <div class="text-xs text-slate-500"><%= log.actorUserId || '-' %></div>
+          </td>
+          <td class="max-w-[380px]">
+            <div class="text-sm font-medium"><%= log.message %></div>
+            <div class="text-xs text-slate-500 mt-1">requestId: <%= log.requestId || '-' %> • ip: <%= log.ip || '-' %></div>
+          </td>
+          <td class="max-w-[320px]">
+            <button type="button" class="btn-secondary !py-1 !px-2 text-xs log-detail-toggle" data-target="<%= detailId %>">👁 Voir</button>
+            <div id="<%= detailId %>" class="hidden text-xs space-y-2">
+              <div><strong>Adresse IP:</strong> <%= log.ip || '-' %></div>
+              <div><strong>User agent:</strong> <%= log.userAgent || '-' %></div>
+              <% const cc = metaObj.clientContext || {}; const geo = cc.geo || {}; const net = cc.network || {}; %>
+              <div><strong>Localisation:</strong> <%= [geo.city, geo.region, geo.country, geo.timezone].filter(Boolean).join(', ') || 'Non disponible' %></div>
+              <div><strong>Opérateur / réseau:</strong> <%= [net.operator, net.asn].filter(Boolean).join(' • ') || 'Non disponible' %></div>
+              <details>
+                <summary class="cursor-pointer font-semibold">Méta JSON</summary>
+                <pre class="mt-1 text-[11px] bg-white border rounded p-2 overflow-auto whitespace-pre-wrap"><%= JSON.stringify(metaObj, null, 2) %></pre>
+              </details>
+            </div>
+          </td>
+        </tr>
+      <% }) %>
+      </tbody>
+    </table>
+    <% if (!logs.length) { %><div class="text-sm text-slate-500 mt-4">Aucun log pour ce filtre.</div><% } %>
+  </div>
+
+  <div class="flex justify-center gap-2">
+    <% if (page > 1) { %><a class="btn-secondary" href="?<%= new URLSearchParams({ ...filters, page: page - 1 }).toString() %>">Préc.</a><% } %>
+    <span class="px-3 py-2 text-sm">Page <%= page %> / <%= totalPages %> • <%= count %> logs</span>
+    <% if (page < totalPages) { %><a class="btn-secondary" href="?<%= new URLSearchParams({ ...filters, page: page + 1 }).toString() %>">Suiv.</a><% } %>
+  </div>
+</section></main><%- include('../../partials/footer') %>
+<dialog id="logDetailModal" class="rounded-2xl p-0 border border-slate-200 shadow-2xl w-[min(760px,95vw)] backdrop:bg-slate-900/40">
+  <div class="p-4 border-b border-slate-200 flex items-center justify-between bg-white">
+    <h3 class="font-bold">Détails du log</h3>
+    <button type="button" id="logDetailClose" class="btn-secondary !py-1 !px-2 text-xs">Fermer</button>
+  </div>
+  <div id="logDetailBody" class="p-4 bg-white text-sm"></div>
+</dialog>
+<script>
+  (function () {
+    const buttons = document.querySelectorAll('.log-detail-toggle');
+    const modal = document.getElementById('logDetailModal');
+    const closeBtn = document.getElementById('logDetailClose');
+    const body = document.getElementById('logDetailBody');
+    buttons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.target;
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (!modal || !body || typeof modal.showModal !== 'function') return;
+        body.innerHTML = `<div class="border rounded-lg p-3 bg-slate-50">${el.innerHTML}</div>`;
+        modal.showModal();
+      });
+    });
+    if (closeBtn && modal) {
+      closeBtn.addEventListener('click', () => modal.close());
+      modal.addEventListener('click', (e) => {
+        const r = modal.getBoundingClientRect();
+        const inside = r.top <= e.clientY && e.clientY <= r.top + r.height && r.left <= e.clientX && e.clientX <= r.left + r.width;
+        if (!inside) modal.close();
+      });
+    }
+  })();
+</script>

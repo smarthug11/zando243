@@ -1,0 +1,95 @@
+:root {
+  --primary: #1969e1;
+  --bg: #f6f7f8;
+  --text: #0f172a;
+}
+body {
+  background: radial-gradient(circle at top right, rgba(25, 105, 225, 0.08), transparent 35%), var(--bg);
+}
+.container-max {
+  max-width: 1200px;
+}
+.card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+}
+.btn-primary {
+  background: var(--primary);
+  color: #fff;
+  border-radius: 10px;
+  padding: 0.65rem 1rem;
+  font-weight: 600;
+}
+.btn-secondary {
+  background: #e2e8f0;
+  color: #0f172a;
+  border-radius: 10px;
+  padding: 0.55rem 0.9rem;
+}
+.form-input, .form-select, .form-textarea {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 0.65rem 0.75rem;
+  background: #fff;
+}
+.table-shell table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.table-shell th, .table-shell td {
+  border-bottom: 1px solid #e2e8f0;
+  padding: 0.6rem;
+  text-align: left;
+}
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.status-badge::before {
+  content: "";
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.9;
+}
+.status-processing {
+  color: #475569;
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+.status-shipped {
+  color: #1d4ed8;
+  background: #dbeafe;
+  border-color: #93c5fd;
+}
+.status-delivered {
+  color: #047857;
+  background: #d1fae5;
+  border-color: #6ee7b7;
+}
+.status-cancelled {
+  color: #a16207;
+  background: #fef3c7;
+  border-color: #fcd34d;
+}
+.status-refunded {
+  color: #b91c1c;
+  background: #fee2e2;
+  border-color: #fca5a5;
+}
+.status-default {
+  color: #6b7280;
+  background: #f3f4f6;
+  border-color: #d1d5db;
+}

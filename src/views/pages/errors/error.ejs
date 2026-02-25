@@ -1,0 +1,11 @@
+<%- include('../../partials/head', { title: title || 'Erreur' }) %>
+<%- include('../../partials/navbar') %>
+<main class="container-max mx-auto px-4 py-16">
+  <div class="max-w-2xl mx-auto card p-6">
+    <h1 class="text-2xl font-extrabold mb-2">Erreur <%= status %></h1>
+    <p class="text-slate-700"><%= error?.message || 'Une erreur est survenue.' %></p>
+    <% if (error?.details) { %><pre class="mt-4 text-xs bg-slate-50 p-3 rounded-xl overflow-auto"><%= JSON.stringify(error.details, null, 2) %></pre><% } %>
+    <a href="/" class="btn-primary inline-block mt-4">Accueil</a>
+  </div>
+</main>
+<%- include('../../partials/footer') %>

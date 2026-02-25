@@ -1,0 +1,223 @@
+{\rtf1\ansi\deff0\nouicompat{\fonttbl{\f0\fnil\fcharset0 Calibri;}{\f1\fnil\fcharset1 Segoe UI Symbol;}}
+{\*\generator Riched20 10.0.19041}\viewkind4\uc1 
+\pard\sa200\sl276\slmult1\f0\fs22\lang12 R\'d4LE\par
+Tu es un ing\'e9nieur logiciel senior (Node.js/Express/PostgreSQL/Sequelize) sp\'e9cialis\'e9 e-commerce. \par
+Tu dois g\'e9n\'e9rer un projet COMPLET, propre, modulaire, pr\'eat \'e0 lancer, en suivant MVC + bonnes pratiques s\'e9curit\'e9/UX.\par
+\par
+CONTEXTE PRODUIT\par
+Je d\'e9veloppe une plateforme e-commerce type \ldblquote miroir\rdblquote  Amazon/AliExpress (catalogue, recherche, panier, commandes, avis, etc.). \par
+J\rquote ai d\'e9j\'e0 quelques maquettes U a partir desquelles je veux que tu t'inspires. Je veux que tu g\'e9n\'e8res :\par
+- la structure serveur (Express),\par
+- le rendu SSR (les vues EJS),\par
+- la base PostgreSQL,\par
+- les mod\'e8les Sequelize + migrations + seeders,\par
+- les routes/controllers/services/middlewares,\par
+- une base UX \ldblquote pro\rdblquote  (favoris, tracking, retours, notifications, etc.).\par
+\par
+STACK TECHNIQUE\par
+- Node.js + Express\par
+- EJS (SSR)\par
+- PostgreSQL\par
+- Sequelize (models + migrations + seeders)\par
+- Auth: JWT (access + refresh) + cookies httpOnly (si pertinent)\par
+- Password: bcrypt\par
+- Validation: express-validator (ou \'e9quivalent)\par
+- S\'e9curit\'e9: helmet, rate-limit, csurf (pour formulaires SSR), sanitization, protection XSS/SQLi\par
+- Sessions: uniquement si n\'e9cessaire (ex: panier invit\'e9), sinon JWT\par
+\par
+EXIGENCES G\'c9N\'c9RALES\par
+1) Projet modulaire (MVC + couche \ldblquote services\rdblquote  + \ldblquote repositories\rdblquote  si utile)\par
+2) Code comment\'e9 en FR, gestion d\rquote erreurs robuste (Error classes + error middleware)\par
+3) Logs structur\'e9s (pino/winston) + requestId\par
+4) Variables d\rquote env via .env + config/ (dev/prod)\par
+5) Scripts npm: dev, start, migrate, seed, test (au moins minimal)\par
+6) Fournir un README clair (installation, env vars, commandes, structure)\par
+\par
+FONCTIONNALIT\'c9S CORE (USER)\par
+A) Auth & Compte\par
+- Inscription/connexion, refresh token, logout\par
+- R\'f4les: CUSTOMER, ADMIN\par
+- Profil: nom, pr\'e9nom, email, t\'e9l\'e9phone (optionnel), avatar (URL), points fid\'e9lit\'e9\par
+- V\'e9rification email (token) + reset password\par
+- Gestion des adresses (multi adresses) + adresse par d\'e9faut\par
+\par
+B) Catalogue & Navigation\par
+- Products: nom, description, poids (en kg), prix d'achat, prix (de vente sans livraison), prix final car le prix final affich\'e9 sur l'ecran = celui pay\'e9 par le client = prix sans livraison + 11 * le poids de l'article en kg), stock, SKU, brand (optionnel), status (ACTIVE/DRAFT), mots-cl\'e9s\par
+- Images multiples (table ProductImage + ordre + image principale)\par
+- Variantes (optionnel mais recommand\'e9): taille/couleur, et stock par variante\par
+- Categories hi\'e9rarchiques (parentId) + slug\par
+- Recherche + filtres: cat\'e9gorie, prix min/max, rating min, stock, tri (prix, nouveaut\'e9, popularit\'e9)\par
+- Pagination + SEO SSR basique (title/meta dynamiques)\par
+\par
+C) Panier & Favoris\par
+- Panier invit\'e9 (session) + panier connect\'e9 (DB) et fusion \'e0 la connexion\par
+- Wishlist / Favoris:\par
+  - Ajouter/retirer un produit en favoris\par
+  - Page \ldblquote Mes favoris\rdblquote\par
+  - Option \ldblquote d\'e9placer vers panier\rdblquote\par
+- Sauvegarde \ldblquote pour plus tard\rdblquote  dans panier (Save for later)\par
+\par
+D) Commandes & Paiement (simulation)\par
+- Order + OrderItem\par
+- Statuts: Processing, Shipped, Delivered, Cancelled, Refunded (si retour)\par
+- Totaux: subtotal, shippingFee (normalement \'e0 0 mais c'est un suppl\'e9ment \'e0 rajouter de 5$ pour la livraison \'e0 la porte au lieu de venir le chercher dans un bureau), discountTotal, total (total = prix sans livraison + 15$ * le poids de l'article en kg, sans compter discount etc)\par
+- Historique de suivi: OrderStatusHistory (date + note)\par
+- M\'e9thodes de paiement (simulation): CASH_ON_DELIVERY, CARD (stub), MOBILE_MONEY (stub)\par
+- G\'e9n\'e9ration num\'e9ro de commande unique (ex: ORD-YYYY-xxxxx)\par
+- Factures PDF automatiques\par
+\par
+E) Avis & Confiance\par
+- Review: note (1-5), commentaire, userId, productId, \ldblquote verifiedPurchase\rdblquote  si l\rquote utilisateur a achet\'e9\par
+- Mod\'e9ration admin: hide/unhide, delete\par
+- Agr\'e9gation: avgRating + countReviews (champ calcul\'e9 ou mat\'e9rialis\'e9 via hooks/cron)\par
+\par
+F) Promotions & Fid\'e9lit\'e9\par
+- Points fid\'e9lit\'e9: conversion prix -> points (r\'e8gles configurables)\par
+- Coupons/promo codes (recommand\'e9):\par
+  - Code, type (PERCENT/FIXED), valeur, minCart, maxDiscount, date d\'e9but/fin, usageLimit, usagePerUser\par
+- Prix barr\'e9s / % r\'e9duction par produit (salePrice / discountPercent)\par
+- Calcul automatique au checkout (service d\'e9di\'e9)\par
+\par
+G) Bonus: MODULE LOGISTIQUE\par
+- suivi colis (pour le client et pour les admin)\par
+- consolidation \par
+- frais douane\par
+- poids/volume\par
+- interface complete de gestion logistique\par
+\par
+FONCTIONNALIT\'c9S \ldblquote PRO\rdblquote  (UX / BUSINESS)\par
+1) Notifications:\par
+- Table Notification (userId, type, message, readAt)\par
+- Ex: commande exp\'e9di\'e9e, livr\'e9e, promo, etc.\par
+- Flash messages (succ\'e8s/erreurs)\par
+- Email confirmation basique (optionnel)\par
+\par
+2) Retours / Remboursements (simple mais r\'e9aliste)\par
+- ReturnRequest: orderId, reason, status (Requested/Approved/Rejected/Received/Refunded)\par
+- ON NE REMBOURSE DES ARTICLES QUE SI LA LIVRAISON N'A PAS EU LIEU (si il n'ont jamais re\'e7u leurs commandes)\par
+\par
+3) Support client (ticketing l\'e9ger)\par
+- SupportTicket + messages\par
+- Statuts: Open/Pending/Closed\par
+- Email confirmation basique (optionnel)\par
+\par
+4) Tracking comportement (optionnel mais utile)\par
+- RecentlyViewed: userId (ou sessionId), productId, viewedAt\par
+- Page \ldblquote R\'e9cemment consult\'e9s\rdblquote\par
+- "Produits similaires"\par
+- "Les clients ont aussi achet\'e9"\par
+\par
+5) S\'e9curit\'e9 & anti-abus\par
+- Page 404 (et autres erreurs)\par
+- Rate limit login / reset password\par
+- Protection CSRF sur formulaires EJS\par
+- Validation forte sur entr\'e9es + sanitization\par
+- Strat\'e9gie \ldblquote soft delete\rdblquote  (paranoid) sur entit\'e9s sensibles (User, Product)\par
+\par
+6) SEO + Performance\par
+- Sitemap.xml\par
+- Robots.txt\par
+- Slugs optimis\'e9s\par
+\par
+ADMIN DASHBOARD\par
+- Auth admin + autorisations middleware\par
+- Stats ventes: revenus total, commandes/jour, top produits, top cat\'e9gories, panier moyen\par
+- Gestion catalogue: CRUD produit, images, cat\'e9gories, stocks, variantes\par
+- Gestion clients: activer/bloquer, voir commandes, ajuster points fid\'e9lit\'e9\par
+- Gestion commandes: changer statut, ajouter note interne, refund (simul\'e9)\par
+- Gestion promos/coupons\par
+- Mod\'e9ration avis\par
+- Gestion retours & tickets support\par
+\par
+STRUCTURE ATTENDUE DU PROJET\par
+- /src\par
+  - /config (db, env, jwt, app)\par
+  - /models (Sequelize)\par
+  - /migrations\par
+  - /seeders\par
+  - /routes\par
+  - /controllers\par
+  - /services (checkoutService, loyaltyService, promoService, orderService, etc.)\par
+  - /middlewares (auth, roles, validation, errorHandler, csrf, rateLimit)\par
+  - /views (EJS + layouts + partials)\par
+  - /public (css/js/images)\par
+  - /utils (logger, slugify, pagination, response helpers)\par
+- app.js + server.js (s\'e9paration recommand\'e9e)\par
+\par
+\par
+MOD\'c8LES (MINIMUM OBLIGATOIRE)\par
+- User (role, profile fields, loyaltyPoints, isActive, passwordHash, emailVerifiedAt)\par
+- Address (userId, label, number, street, neighborhood, municipality, city, country, isDefault)\par
+- Category (name, slug, parentId)\par
+- Product (name, slug, description, purchasePrice, priceWithoutDelivery, salePrice, stock, sku, status, keywords)\par
+- ProductImage (productId, url, isMain, position)\par
+- Cart (userId nullable, sessionId nullable)\par
+- CartItem (cartId, productId (et variantId optionnel), qty, savedForLater bool)\par
+- Favorite (userId, productId, createdAt)  \f1\u9989?\f0  (wishlist)\par
+- Order (userId, addressSnapshot JSON, totals, paymentMethod, status, trackingNumber optional)\par
+- OrderItem (orderId, productSnapshot JSON, unitPrice, qty)\par
+- OrderStatusHistory (orderId, status, note)\par
+- Review (userId, productId, rating, comment, isHidden, verifiedPurchase)\par
+- Coupon (code, type, value, constraints, validity, usage)\par
+- CouponRedemption (couponId, userId, orderId)\par
+- Notification (userId, type, message, readAt)\par
+- ReturnRequest (orderId, reason, status)\par
+- SupportTicket + SupportMessage\par
+- RecentlyViewed (userId/sessionId, productId, viewedAt)\par
+\par
+ROUTES (EXEMPLES OBLIGATOIRES)\par
+Public:\par
+- GET /, GET /products, GET /products/:slug, GET /categories/:slug\par
+- GET /search?q=&category=&min=&max=&rating=&sort=&page=\par
+Auth:\par
+- GET/POST /auth/register, /auth/login, POST /auth/refresh, POST /auth/logout\par
+Customer:\par
+- GET/POST /account/profile\par
+- CRUD /account/addresses\par
+- GET /cart, POST /cart/items, PATCH /cart/items/:id, DELETE /cart/items/:id\par
+- POST /cart/items/:id/save-for-later\par
+- GET /favorites, POST /favorites/:productId, DELETE /favorites/:productId\par
+- POST /checkout, GET /orders, GET /orders/:id\par
+- POST /orders/:id/return-request\par
+- CRUD /tickets + messages\par
+Admin:\par
+- GET /admin, GET /admin/stats\par
+- CRUD /admin/products, /admin/categories\par
+- CRUD /admin/orders + status\par
+- CRUD /admin/coupons\par
+- /admin/reviews moderation\par
+- /admin/refunds\par
+- /admin/users block/unblock\par
+\par
+LOGIQUE M\'c9TIER (\'c0 IMPL\'c9MENTER EN SERVICES)\par
+- Calcul panier (subtotal, shippingFee, discountTotal, total)\par
+- Application coupon + r\'e8gles d\rquote\'e9ligibilit\'e9\par
+- Attribution points fid\'e9lit\'e9 \'e0 la livraison (ou \'e0 la commande pay\'e9e)\par
+- Gestion stock (d\'e9cr\'e9ment \'e0 la commande, rollback si annul\'e9e)\par
+- Favoris: toggle, liste pagin\'e9e, \ldblquote move to cart\rdblquote\par
+- Fusion panier invit\'e9 -> user au login\par
+- Snapshot produits/adresse dans Order/OrderItem (pour historique fiable)\par
+\par
+MIGRATIONS + SEED\par
+- Cr\'e9er migrations pour tous les mod\'e8les\par
+- Seed coh\'e9rent: \par
+  - 2 admins, 10 users\par
+  - 8 cat\'e9gories hi\'e9rarchiques\par
+  - 60 produits + images\par
+  - quelques reviews\par
+  - paniers, commandes, retours, coupons, notifications\par
+\par
+LIVRABLES\par
+1) Code complet dans un repo structur\'e9\par
+2) app.js/server.js configur\'e9s (cors, helmet, parsing, csrf SSR, sessions si panier invit\'e9, etc.)\par
+3) config database PostgreSQL (Sequelize)\par
+4) migrations + seeders\par
+5) pages EJS de base (layout, navbar, footer, product list, product detail, cart, favorites, account, admin dashboard)\par
+6) README\par
+\par
+CONTRAINTE QUALIT\'c9\par
+- Tout doit fonctionner apr\'e8s \ldblquote npm i\rdblquote , config .env, \ldblquote npm run migrate && npm run seed && npm run dev\rdblquote .\par
+- Ne laisse pas de TODO critiques.\par
+- Priorise la stabilit\'e9, la s\'e9curit\'e9, et l\rquote exp\'e9rience utilisateur.\par
+}
+ 

@@ -1,0 +1,60 @@
+<%- include('../../partials/head', { title }) %>
+<%- include('../../partials/navbar') %>
+<%- include('../../partials/flash') %>
+<main class="container-max mx-auto px-4 py-6 grid lg:grid-cols-[1fr_360px] gap-6">
+  <section class="space-y-6">
+    <div class="card p-5">
+      <h1 class="text-2xl font-extrabold"><%= order.orderNumber %></h1>
+      <div class="text-sm text-slate-500 mt-1">Statut: <strong><%= order.status %></strong> • Paiement: <%= order.paymentMethod %></div>
+      <div class="mt-4 table-shell overflow-auto">
+        <table>
+          <thead><tr><th>Article</th><th>Qté</th><th>PU</th><th>Total</th></tr></thead>
+          <tbody>
+          <% order.items.forEach(i => { %>
+            <tr><td><%= i.productSnapshot?.name %></td><td><%= i.qty %></td><td>$<%= i.unitPrice %></td><td>$<%= i.lineTotal %></td></tr>
+          <% }) %>
+          </tbody>
+        </table>
+      </div>
+      <div class="mt-4 grid md:grid-cols-2 gap-4 text-sm">
+        <div class="border rounded-xl p-3"><strong>Adresse snapshot</strong><pre class="whitespace-pre-wrap text-xs mt-2"><%= JSON.stringify(order.addressSnapshot, null, 2) %></pre></div>
+        <div class="border rounded-xl p-3">
+          <div>Sous-total: $<%= order.subtotal %></div>
+          <div>Livraison: $<%= order.shippingFee %></div>
+          <div>Réduction: $<%= order.discountTotal %></div>
+          <div class="font-bold text-blue-700 mt-2">Total: $<%= order.total %></div>
+          <div class="mt-2">Tracking: <%= order.trackingNumber || '-' %></div>
+        </div>
+      </div>
+    </div>
+    <div class="card p-5">
+      <h2 class="font-bold mb-3">Historique de suivi</h2>
+      <div class="space-y-2">
+        <% (order.statusHistory||[]).sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt)).forEach(h => { %>
+          <div class="border rounded-lg p-3 text-sm">
+            <div class="font-semibold"><%= h.status %></div>
+            <div><%= h.note || '' %></div>
+            <div class="text-xs text-slate-500"><%= new Date(h.createdAt).toLocaleString('fr-FR') %></div>
+          </div>
+        <% }) %>
+      </div>
+    </div>
+  </section>
+  <aside class="card p-5 h-fit">
+    <h2 class="font-bold mb-3">Retour / remboursement</h2>
+    <% if (order.returnRequest) { %>
+      <div class="text-sm border rounded-xl p-3">
+        <div>Statut: <strong><%= order.returnRequest.status %></strong></div>
+        <div class="mt-1"><%= order.returnRequest.reason %></div>
+      </div>
+    <% } else { %>
+      <p class="text-sm text-slate-600 mb-3">Règle: remboursement uniquement si la livraison n’a pas eu lieu.</p>
+      <form action="/orders/<%= order.id %>/return-request" method="POST" class="space-y-3">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <textarea class="form-textarea" name="reason" rows="4" placeholder="Motif"></textarea>
+        <button class="btn-primary w-full">Demander un retour</button>
+      </form>
+    <% } %>
+  </aside>
+</main>
+<%- include('../../partials/footer') %>

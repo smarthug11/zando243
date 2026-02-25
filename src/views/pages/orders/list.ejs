@@ -1,0 +1,26 @@
+﻿<%- include('../../partials/head', { title }) %>
+<%- include('../../partials/navbar') %>
+<%- include('../../partials/flash') %>
+<main class="container-max mx-auto px-4 py-6">
+  <h1 class="text-2xl font-extrabold mb-4">Mes commandes</h1>
+  <div class="space-y-3">
+    <% orders.forEach(o => { %>
+      <a href="/orders/<%= o.id %>" class="card p-4 block hover:shadow">
+        <div class="flex flex-wrap justify-between gap-2">
+          <div>
+            <div class="text-xs text-slate-500">Date: <%= new Date(o.createdAt).toLocaleDateString('fr-FR') %></div>
+            <div class="font-semibold"><%= o.orderNumber %></div>
+            <div class="text-sm text-slate-500"><%= o.paymentMethod %></div>
+          </div>
+          <div class="text-right">
+            <div class="font-bold text-blue-700">$<%= o.total %></div>
+            <div class="text-sm"><%= o.status %></div>
+          </div>
+        </div>
+      </a>
+    <% }) %>
+    <% if (!orders.length) { %><div class="card p-6 text-slate-500">Aucune commande.</div><% } %>
+  </div>
+</main>
+<%- include('../../partials/footer') %>
+

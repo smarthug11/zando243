@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Customer Management - Admin Portal</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#1969e1",
+                        "background-light": "#f6f7f8",
+                        "background-dark": "#111721",
+                    },
+                    fontFamily: {
+                        "display": ["Inter"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark font-display text-[#111418] antialiased">
+<div class="flex flex-col min-h-screen max-w-md mx-auto bg-white dark:bg-background-dark shadow-xl overflow-hidden relative">
+<!-- Header Section -->
+<header class="sticky top-0 z-10 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md border-b border-primary/10">
+<div class="flex items-center p-4 justify-between">
+<div class="flex items-center gap-3">
+<button class="p-2 hover:bg-primary/10 rounded-full transition-colors">
+<span class="material-symbols-outlined text-primary">arrow_back</span>
+</button>
+<h1 class="text-xl font-bold tracking-tight text-[#111418] dark:text-white">Customer Management</h1>
+</div>
+<button class="p-2 hover:bg-primary/10 rounded-full transition-colors">
+<span class="material-symbols-outlined text-primary">person_add</span>
+</button>
+</div>
+<!-- Search Bar -->
+<div class="px-4 pb-4">
+<label class="relative flex items-center group">
+<span class="material-symbols-outlined absolute left-4 text-primary group-focus-within:text-primary">search</span>
+<input class="w-full h-12 pl-12 pr-4 bg-primary/5 border-none rounded-xl focus:ring-2 focus:ring-primary/50 text-base placeholder:text-primary/40 text-[#111418] dark:text-white" placeholder="Search by name or email..." type="text"/>
+</label>
+</div>
+<!-- Filter Chips -->
+<div class="flex gap-2 px-4 pb-4 overflow-x-auto no-scrollbar">
+<button class="flex h-9 shrink-0 items-center justify-center rounded-full bg-primary px-6 text-sm font-semibold text-white transition-all shadow-md shadow-primary/20">
+                    All
+                </button>
+<button class="flex h-9 shrink-0 items-center justify-center rounded-full bg-primary/5 border border-primary/10 px-6 text-sm font-medium text-primary hover:bg-primary/10 transition-all">
+                    Active
+                </button>
+<button class="flex h-9 shrink-0 items-center justify-center rounded-full bg-primary/5 border border-primary/10 px-6 text-sm font-medium text-primary hover:bg-primary/10 transition-all">
+                    Inactive
+                </button>
+<button class="flex h-9 shrink-0 items-center justify-center rounded-full bg-primary/5 border border-primary/10 px-6 text-sm font-medium text-primary hover:bg-primary/10 transition-all">
+                    Blocked
+                </button>
+</div>
+</header>
+<!-- Customer List Container -->
+<main class="flex-1 overflow-y-auto px-4 py-2 space-y-3">
+<!-- Customer Entry 1 -->
+<div class="bg-white dark:bg-slate-900/50 border border-primary/5 p-4 rounded-xl flex items-center justify-between shadow-sm hover:shadow-md transition-shadow">
+<div class="flex items-center gap-4">
+<div class="relative">
+<img class="size-14 rounded-full object-cover border-2 border-primary/10" data-alt="Professional portrait of a male customer" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDdxGNQkL_x6jypMUoQQBLlPr8VJ74v5YjlMwbzBEOmSX9imxbQRnlVRSLO56jsKLIzcLvdlOjrRTbflrgZH3dORkbDAKKVleLX1cfDMTS8jUIyV41UjEQXPaQkXHbiqEIHzduDogq8MZVvbBXgDfDyhghjbn2V5XOHzPCRXFrzeGYq1s8s0KeIvSWUUfZSZmwkZvQ8wWuJgbSk87PgiDAiTo8N3pqrZWhm6FEmk18NylzLmH19xkX_aItUFNPKPZtzVu_QyuE903E"/>
+<span class="absolute bottom-0 right-0 size-3.5 bg-green-500 border-2 border-white dark:border-slate-900 rounded-full"></span>
+</div>
+<div class="flex flex-col">
+<h3 class="font-bold text-[#111418] dark:text-white">Johnathan Doe</h3>
+<p class="text-xs text-[#637288] dark:text-slate-400">john.doe@enterprise.com</p>
+<div class="flex items-center gap-2 mt-1">
+<span class="text-[10px] font-bold uppercase tracking-wider text-primary bg-primary/10 px-2 py-0.5 rounded">15 Orders</span>
+<span class="text-[10px] font-bold uppercase tracking-wider text-green-600 bg-green-100 px-2 py-0.5 rounded">Active</span>
+</div>
+</div>
+</div>
+<button class="p-2 hover:bg-primary/5 rounded-lg text-primary">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+<!-- Customer Entry 2 -->
+<div class="bg-white dark:bg-slate-900/50 border border-primary/5 p-4 rounded-xl flex items-center justify-between shadow-sm hover:shadow-md transition-shadow">
+<div class="flex items-center gap-4">
+<div class="relative">
+<img class="size-14 rounded-full object-cover border-2 border-primary/10" data-alt="Smiling female customer profile photo" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBTFB0zwsUp0nVesaHBOou71zzKUDlVie5Or6g_TxA0Y7KSudUJZkePIEIq0QCYA36eKDHohXlpT4FrHtzOXO8gGSxNijQJI7Tw_agOTG6cEyZoW_3X3LZo7WW3ppbH_iRnhqSD2gJAwSxD8GtWNKmcpKMvymO00kNatzdIN8URThDqpD4ndnOIjbaKIfoJe4vmUCA3qWe-KzkUkjt0hL9cMlOgYGG0Al5IiIC5xAUOxT-QzvuLgk59LQf1fxjvvTntfEJZwqqfki4"/>
+<span class="absolute bottom-0 right-0 size-3.5 bg-yellow-500 border-2 border-white dark:border-slate-900 rounded-full"></span>
+</div>
+<div class="flex flex-col">
+<h3 class="font-bold text-[#111418] dark:text-white">Sarah Jenkins</h3>
+<p class="text-xs text-[#637288] dark:text-slate-400">s.jenkins@webmail.io</p>
+<div class="flex items-center gap-2 mt-1">
+<span class="text-[10px] font-bold uppercase tracking-wider text-primary bg-primary/10 px-2 py-0.5 rounded">42 Orders</span>
+<span class="text-[10px] font-bold uppercase tracking-wider text-yellow-600 bg-yellow-100 px-2 py-0.5 rounded">Inactive</span>
+</div>
+</div>
+</div>
+<button class="p-2 hover:bg-primary/5 rounded-lg text-primary">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+<!-- Customer Entry 3 -->
+<div class="bg-white dark:bg-slate-900/50 border border-primary/5 p-4 rounded-xl flex items-center justify-between shadow-sm hover:shadow-md transition-shadow">
+<div class="flex items-center gap-4">
+<div class="relative">
+<img class="size-14 rounded-full object-cover border-2 border-primary/10 grayscale" data-alt="Customer avatar for blocked user" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAFC3M9bcGSuNjUb3WIX88cJbYd5rThqSSDVa0uhaVw6Ota5TI-cB1C17Cp1hQbLulzzCQscL4Dxj4Rt5Be7frxYVbLMlWDDHasMnAgwkJXd2-YFwD6pJ1uNhdLiA8bY_IE6EcpDBZmw_PAF2BBZIe4QyCM12XpHAWt1-c6yJwMhnVO9GLKUqmCKuFPZ0aI0w8hmvHF75Lk6a98l42U4cwbz-8DiWQTDxxjcpcl1h81E7Ky6Jwoi-KD08BVXq_pdMR_S59ZTBk1zWU"/>
+<span class="absolute bottom-0 right-0 size-3.5 bg-red-500 border-2 border-white dark:border-slate-900 rounded-full"></span>
+</div>
+<div class="flex flex-col">
+<h3 class="font-bold text-[#111418] dark:text-white opacity-75">Michael Chen</h3>
+<p class="text-xs text-[#637288] dark:text-slate-400 opacity-75">m.chen88@gmail.com</p>
+<div class="flex items-center gap-2 mt-1">
+<span class="text-[10px] font-bold uppercase tracking-wider text-primary bg-primary/10 px-2 py-0.5 rounded">2 Orders</span>
+<span class="text-[10px] font-bold uppercase tracking-wider text-red-600 bg-red-100 px-2 py-0.5 rounded">Blocked</span>
+</div>
+</div>
+</div>
+<button class="p-2 hover:bg-primary/5 rounded-lg text-primary">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+<!-- Customer Entry 4 -->
+<div class="bg-white dark:bg-slate-900/50 border border-primary/5 p-4 rounded-xl flex items-center justify-between shadow-sm hover:shadow-md transition-shadow">
+<div class="flex items-center gap-4">
+<div class="relative">
+<img class="size-14 rounded-full object-cover border-2 border-primary/10" data-alt="Professional female admin user" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCIg3qo3I8slU-jcIA_BLUHrwjCAMo228pJEEjJgM_VuUwsk4P-SAsDIwkjuf7wdkQdWuCVjQj3I9wM7fy4EwPRJoOoUKRu0ovjWDGVKPM05ES5stDLTcrJnorkvVSeEUcs-EpoAIMtoqkjK0_0s-KY_spdIPaEXlm3FDqyCQkiockPyDFoSsDAdV0y1MGGubWgm_K30Mtq8PukqpErcey96MIiC_4YGMTtKtIjyHINCjMJY41EuPchLOtDHS2kpcWEzsDw-623SVs"/>
+<span class="absolute bottom-0 right-0 size-3.5 bg-green-500 border-2 border-white dark:border-slate-900 rounded-full"></span>
+</div>
+<div class="flex flex-col">
+<h3 class="font-bold text-[#111418] dark:text-white">Elena Rodriguez</h3>
+<p class="text-xs text-[#637288] dark:text-slate-400">elena.rod@design.co</p>
+<div class="flex items-center gap-2 mt-1">
+<span class="text-[10px] font-bold uppercase tracking-wider text-primary bg-primary/10 px-2 py-0.5 rounded">108 Orders</span>
+<span class="text-[10px] font-bold uppercase tracking-wider text-green-600 bg-green-100 px-2 py-0.5 rounded">Active</span>
+</div>
+</div>
+</div>
+<button class="p-2 hover:bg-primary/5 rounded-lg text-primary">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+<!-- Customer Entry 5 -->
+<div class="bg-white dark:bg-slate-900/50 border border-primary/5 p-4 rounded-xl flex items-center justify-between shadow-sm hover:shadow-md transition-shadow">
+<div class="flex items-center gap-4">
+<div class="relative text-primary bg-primary/10 size-14 rounded-full flex items-center justify-center border-2 border-primary/20">
+<span class="font-bold text-lg">BT</span>
+<span class="absolute bottom-0 right-0 size-3.5 bg-green-500 border-2 border-white dark:border-slate-900 rounded-full"></span>
+</div>
+<div class="flex flex-col">
+<h3 class="font-bold text-[#111418] dark:text-white">Blake Thompson</h3>
+<p class="text-xs text-[#637288] dark:text-slate-400">blake.t@provider.net</p>
+<div class="flex items-center gap-2 mt-1">
+<span class="text-[10px] font-bold uppercase tracking-wider text-primary bg-primary/10 px-2 py-0.5 rounded">0 Orders</span>
+<span class="text-[10px] font-bold uppercase tracking-wider text-green-600 bg-green-100 px-2 py-0.5 rounded">Active</span>
+</div>
+</div>
+</div>
+<button class="p-2 hover:bg-primary/5 rounded-lg text-primary">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+</main>
+<!-- Bottom Navigation Bar -->
+<nav class="sticky bottom-0 bg-white dark:bg-background-dark border-t border-primary/5 px-4 pb-6 pt-3">
+<div class="flex justify-between items-center max-w-sm mx-auto">
+<a class="flex flex-col items-center gap-1 text-[#637288] hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined">grid_view</span>
+<p class="text-[10px] font-bold uppercase tracking-wider">Dashboard</p>
+</a>
+<a class="flex flex-col items-center gap-1 text-[#637288] hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined">inventory_2</span>
+<p class="text-[10px] font-bold uppercase tracking-wider">Inventory</p>
+</a>
+<a class="flex flex-col items-center gap-1 text-primary" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">group</span>
+<p class="text-[10px] font-bold uppercase tracking-wider">Customers</p>
+<div class="size-1 bg-primary rounded-full mt-0.5"></div>
+</a>
+<a class="flex flex-col items-center gap-1 text-[#637288] hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined">settings</span>
+<p class="text-[10px] font-bold uppercase tracking-wider">Settings</p>
+</a>
+</div>
+</nav>
+<!-- Floating Quick Action Menu (Demo state for "Action Menu") -->
+<div class="hidden absolute inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-end">
+<div class="w-full bg-white dark:bg-background-dark rounded-t-3xl p-6 space-y-4 shadow-2xl">
+<div class="w-12 h-1 bg-primary/20 rounded-full mx-auto mb-2"></div>
+<h4 class="text-center font-bold text-lg text-[#111418] dark:text-white">Customer Actions</h4>
+<div class="grid grid-cols-1 gap-2">
+<button class="flex items-center gap-3 w-full p-4 hover:bg-primary/5 rounded-xl text-[#111418] dark:text-white font-medium">
+<span class="material-symbols-outlined text-primary">visibility</span> View Full Profile
+                    </button>
+<button class="flex items-center gap-3 w-full p-4 hover:bg-primary/5 rounded-xl text-[#111418] dark:text-white font-medium">
+<span class="material-symbols-outlined text-primary">edit</span> Edit Customer Details
+                    </button>
+<button class="flex items-center gap-3 w-full p-4 hover:bg-primary/5 rounded-xl text-[#111418] dark:text-white font-medium">
+<span class="material-symbols-outlined text-primary">mail</span> Send Email Notification
+                    </button>
+<button class="flex items-center gap-3 w-full p-4 hover:bg-red-50 text-red-600 rounded-xl font-medium">
+<span class="material-symbols-outlined">block</span> Block Customer Account
+                    </button>
+</div>
+<button class="w-full py-4 text-[#637288] font-bold uppercase tracking-widest text-xs">Cancel</button>
+</div>
+</div>
+</div>
+</body></html>

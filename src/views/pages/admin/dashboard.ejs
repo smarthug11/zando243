@@ -1,0 +1,151 @@
+﻿<%- include('../../partials/head', { title }) %>
+<%- include('../../partials/navbar') %>
+<%- include('../../partials/flash') %>
+<main class="container-max mx-auto px-4 py-6 grid lg:grid-cols-[240px_1fr] gap-6">
+  <%- include('../../partials/admin-nav') %>
+  <section class="space-y-6">
+    <h1 class="text-2xl font-extrabold">Dashboard Admin</h1>
+    <div class="card p-4">
+      <form method="GET" action="/admin" class="grid md:grid-cols-[1fr_1fr_auto_auto_auto] gap-2 items-end">
+        <div>
+          <label class="text-xs text-slate-500 block mb-1">Date dÃ©but</label>
+          <input class="form-input" type="date" name="startDate" value="<%= stats.filters?.startDate || '' %>">
+        </div>
+        <div>
+          <label class="text-xs text-slate-500 block mb-1">Date fin</label>
+          <input class="form-input" type="date" name="endDate" value="<%= stats.filters?.endDate || '' %>">
+        </div>
+        <button class="btn-primary" type="submit">Filtrer</button>
+        <a class="btn-secondary text-center" href="/admin">Depuis le dÃ©but</a>
+        <div class="flex gap-2">
+          <a class="btn-secondary text-center" href="/admin?<%= new URLSearchParams({ startDate: new Date(Date.now()-7*86400000).toISOString().slice(0,10) }).toString() %>">7 jours</a>
+          <a class="btn-secondary text-center" href="/admin?<%= new URLSearchParams({ startDate: new Date(Date.now()-30*86400000).toISOString().slice(0,10) }).toString() %>">30 jours</a>
+        </div>
+      </form>
+      <div class="text-xs text-slate-500 mt-2">
+        PÃ©riode: <%= stats.filters?.startDate || 'dÃ©but' %> â†’ <%= stats.filters?.endDate || 'maintenant' %>
+      </div>
+    </div>
+    <div class="grid md:grid-cols-5 gap-4" id="metricCards">
+      <button type="button" class="card p-4 text-left border-2 border-blue-500" data-metric="revenueTotal" data-label="Revenus total" data-prefix="$" data-color="rgb(37,99,235)">
+        <div class="text-xs text-slate-500">Revenus total</div><div class="text-2xl font-bold text-blue-700">$<%= Number(stats.revenueTotal).toFixed(2) %></div>
+      </button>
+      <button type="button" class="card p-4 text-left" data-metric="weightDeliveryRevenue" data-label="Frais poids (15$/kg)" data-prefix="$" data-color="rgb(79,70,229)">
+        <div class="text-xs text-slate-500">Frais poids (15$/kg)</div><div class="text-2xl font-bold text-indigo-700">$<%= Number(stats.weightDeliveryRevenue || 0).toFixed(2) %></div>
+      </button>
+      <button type="button" class="card p-4 text-left" data-metric="orderCount" data-label="Nombre de commandes" data-prefix="" data-color="rgb(14,165,233)">
+        <div class="text-xs text-slate-500">Commandes</div><div class="text-2xl font-bold"><%= stats.orderCount %></div>
+      </button>
+      <button type="button" class="card p-4 text-left" data-metric="avgCart" data-label="Panier moyen" data-prefix="$" data-color="rgb(16,185,129)">
+        <div class="text-xs text-slate-500">Panier moyen</div><div class="text-2xl font-bold">$<%= Number(stats.avgCart).toFixed(2) %></div>
+      </button>
+      <button type="button" class="card p-4 text-left" data-metric="usersCount" data-label="Nouveaux clients (pÃ©riode)" data-prefix="" data-color="rgb(234,88,12)">
+        <div class="text-xs text-slate-500">Nouveaux clients (pÃ©riode)</div>
+        <div class="text-2xl font-bold"><%= stats.usersCount %></div>
+        <div class="text-xs text-slate-500 mt-1">Total clients: <%= stats.usersCountTotal || 0 %></div>
+      </button>
+    </div>
+    <div class="card p-5 hidden" id="chartPanel">
+      <div class="flex items-center justify-between gap-3 mb-3">
+        <h2 class="font-bold">Progression</h2>
+        <div class="flex items-center gap-3">
+          <div id="chartTitle" class="text-sm text-slate-600"></div>
+          <button type="button" id="chartCloseBtn" class="btn-secondary !py-1 !px-2 text-xs" aria-label="Fermer le graphique">âœ•</button>
+        </div>
+      </div>
+      <div style="height: 220px; max-height: 220px;">
+        <canvas id="adminMetricChart"></canvas>
+      </div>
+    </div>
+    <div class="card p-5">
+      <h2 class="font-bold mb-3">Commandes rÃ©centes</h2>
+      <div class="table-shell overflow-auto">
+        <table><thead><tr><th>Date</th><th>N?</th><th>Statut</th><th>Paiement</th><th>Frais poids (15$/kg)</th><th>Total</th></tr></thead><tbody>
+          <% stats.recentOrders.forEach(o => { %><tr class="hover:bg-slate-50 cursor-pointer" onclick="window.location='/admin/orders/<%= o.id %>'"><td><%= new Date(o.createdAt).toLocaleDateString('fr-FR') %></td><td><a class="text-blue-700 font-semibold" href="/admin/orders/<%= o.id %>"><%= o.orderNumber %></a></td><td><%- include('../../partials/status-badge', { status: o.status }) %></td><td><%= o.paymentMethod %></td><td>$<%= Number(o.weightDeliveryAmount || 0).toFixed(2) %></td><td>$<%= o.total %></td></tr><% }) %>
+        </tbody></table>
+      </div>
+    </div>
+  </section>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  (function () {
+    const progression = <%- JSON.stringify(stats.progression || { labels: [], series: {} }) %>;
+    const cards = Array.from(document.querySelectorAll('#metricCards [data-metric]'));
+    const chartTitle = document.getElementById('chartTitle');
+    const chartPanel = document.getElementById('chartPanel');
+    const chartCloseBtn = document.getElementById('chartCloseBtn');
+    const canvas = document.getElementById('adminMetricChart');
+    if (!canvas || !window.Chart || !cards.length) return;
+
+    const ctx = canvas.getContext('2d');
+    let chart;
+
+    function destroyChart() {
+      if (chart) {
+        chart.destroy();
+        chart = null;
+      }
+    }
+
+    function closePanel() {
+      destroyChart();
+      if (chartPanel) chartPanel.classList.add('hidden');
+      if (chartTitle) chartTitle.textContent = '';
+      cards.forEach(c => c.classList.remove('border-2', 'border-blue-500'));
+    }
+
+    function renderMetric(card) {
+      const metric = card.dataset.metric;
+      const label = card.dataset.label || metric;
+      const prefix = card.dataset.prefix || '';
+      const color = card.dataset.color || 'rgb(37,99,235)';
+      const data = (progression.series && progression.series[metric]) || [];
+      const labels = progression.labels || [];
+
+      cards.forEach(c => c.classList.remove('border-2', 'border-blue-500'));
+      card.classList.add('border-2', 'border-blue-500');
+      if (chartPanel) chartPanel.classList.remove('hidden');
+      chartTitle.textContent = label;
+
+      destroyChart();
+      chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label,
+            data,
+            borderColor: color,
+            backgroundColor: color.replace('rgb', 'rgba').replace(')', ',0.15)'),
+            tension: 0.25,
+            fill: true,
+            pointRadius: data.length > 40 ? 0 : 2
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => `${label}: ${prefix}${ctx.parsed.y ?? 0}`
+              }
+            }
+          },
+          scales: {
+            x: { ticks: { maxTicksLimit: 12 } },
+            y: { beginAtZero: true }
+          }
+        }
+      });
+    }
+
+    cards.forEach(card => card.addEventListener('click', () => renderMetric(card)));
+    if (chartCloseBtn) chartCloseBtn.addEventListener('click', closePanel);
+  })();
+</script>
+<%- include('../../partials/footer') %>
+

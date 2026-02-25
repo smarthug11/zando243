@@ -1,0 +1,39 @@
+<%- include('../../partials/head', { title }) %>
+<%- include('../../partials/navbar') %>
+<%- include('../../partials/flash') %>
+<main class="container-max mx-auto px-4 py-6 grid lg:grid-cols-[360px_1fr] gap-6">
+  <aside class="card p-5 h-fit">
+    <h1 class="text-xl font-extrabold mb-3">Nouveau ticket</h1>
+    <form action="/tickets" method="POST" class="space-y-3">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <input class="form-input" name="subject" placeholder="Sujet" required>
+      <textarea class="form-textarea" name="message" rows="4" placeholder="Votre message"></textarea>
+      <button class="btn-primary w-full">Créer</button>
+    </form>
+  </aside>
+  <section class="space-y-4">
+    <h2 class="text-2xl font-extrabold">Tickets support</h2>
+    <% tickets.forEach(t => { %>
+      <div class="card p-4">
+        <div class="flex justify-between gap-2">
+          <div><div class="font-semibold"><%= t.subject %></div><div class="text-xs text-slate-500">Statut: <%= t.status %></div></div>
+          <span class="text-xs text-slate-500"><%= new Date(t.createdAt).toLocaleDateString('fr-FR') %></span>
+        </div>
+        <div class="mt-3 space-y-2">
+          <% (t.messages||[]).forEach(m => { %>
+            <div class="border rounded-lg p-3 text-sm">
+              <div class="font-medium"><%= m.author ? `${m.author.firstName} ${m.author.lastName}` : 'Agent' %></div>
+              <div><%= m.message %></div>
+            </div>
+          <% }) %>
+        </div>
+        <form action="/tickets/<%= t.id %>/messages" method="POST" class="mt-3 flex gap-2">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <input class="form-input" name="message" placeholder="Répondre...">
+          <button class="btn-secondary">Envoyer</button>
+        </form>
+      </div>
+    <% }) %>
+  </section>
+</main>
+<%- include('../../partials/footer') %>

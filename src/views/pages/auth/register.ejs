@@ -1,0 +1,20 @@
+<%- include('../../partials/head', { title }) %>
+<%- include('../../partials/navbar') %>
+<%- include('../../partials/flash') %>
+<main class="container-max mx-auto px-4 py-10">
+  <div class="max-w-lg mx-auto card p-6">
+    <h1 class="text-2xl font-extrabold mb-4">Inscription</h1>
+    <form method="POST" action="/auth/register" class="space-y-3">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <div class="grid grid-cols-2 gap-3">
+        <input class="form-input" name="firstName" placeholder="Prénom" required>
+        <input class="form-input" name="lastName" placeholder="Nom" required>
+      </div>
+      <input class="form-input" type="email" name="email" placeholder="Email" required>
+      <input class="form-input" name="phone" placeholder="Téléphone (optionnel)">
+      <input class="form-input" type="password" name="password" placeholder="Mot de passe" required>
+      <button class="btn-primary w-full">Créer le compte</button>
+    </form>
+  </div>
+</main>
+<%- include('../../partials/footer') %>

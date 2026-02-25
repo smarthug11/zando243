@@ -1,0 +1,13 @@
+<%- include('../../partials/head', { title }) %><%- include('../../partials/navbar') %><%- include('../../partials/flash') %>
+<main class="container-max mx-auto px-4 py-6 grid lg:grid-cols-[240px_1fr] gap-6"><%- include('../../partials/admin-nav') %>
+<section class="card p-5 table-shell overflow-auto">
+  <h1 class="text-2xl font-extrabold mb-4">Gestion clients</h1>
+  <table><thead><tr><th>Client</th><th>Email</th><th>Points</th><th>Actif</th><th>Action</th></tr></thead><tbody>
+    <% users.forEach(u => { %>
+      <tr>
+        <td><%= u.firstName %> <%= u.lastName %></td><td><%= u.email %></td><td><%= u.loyaltyPoints %></td><td><%= u.isActive ? 'Oui' : 'Non' %></td>
+        <td><form action="/admin/users/<%= u.id %>/block-toggle" method="POST"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button class="btn-secondary" name="action" value="<%= u.isActive ? 'block' : 'unblock' %>"><%= u.isActive ? 'Bloquer' : 'Débloquer' %></button></form></td>
+      </tr>
+    <% }) %>
+  </tbody></table>
+</section></main><%- include('../../partials/footer') %>

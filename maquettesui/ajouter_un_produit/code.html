@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Add New Product - Admin Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#1969e1",
+                        "background-light": "#f6f7f8",
+                        "background-dark": "#111721",
+                    },
+                    fontFamily: {
+                        "display": ["Inter"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Custom scrollbar for horizontal image gallery */
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark text-[#111418] dark:text-white min-h-screen flex flex-col font-display">
+<!-- Header Section -->
+<header class="sticky top-0 z-50 bg-white dark:bg-background-dark border-b border-gray-200 dark:border-gray-800">
+<div class="flex items-center px-4 py-4 justify-between max-w-2xl mx-auto w-full">
+<button class="flex items-center justify-center p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+<span class="material-symbols-outlined">arrow_back</span>
+</button>
+<h1 class="text-lg font-bold flex-1 text-center pr-10">Add New Product</h1>
+</div>
+</header>
+<!-- Main Content Form -->
+<main class="flex-1 w-full max-w-2xl mx-auto pb-32">
+<form class="p-4 space-y-6">
+<!-- Basic Information Section -->
+<div class="space-y-4 bg-white dark:bg-gray-900/50 p-4 rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm">
+<h3 class="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Basic Information</h3>
+<div class="flex flex-col gap-2">
+<label class="text-sm font-medium">Product Name</label>
+<input class="w-full rounded-lg border-gray-200 dark:border-gray-700 bg-white dark:bg-background-dark focus:ring-primary focus:border-primary p-3" placeholder="e.g. Wireless Noise-Cancelling Headphones" type="text"/>
+</div>
+<div class="flex flex-col gap-2">
+<label class="text-sm font-medium">Category</label>
+<select class="w-full rounded-lg border-gray-200 dark:border-gray-700 bg-white dark:bg-background-dark focus:ring-primary focus:border-primary p-3 appearance-none">
+<option disabled="" selected="" value="">Select a category</option>
+<option value="electronics">Electronics</option>
+<option value="apparel">Apparel</option>
+<option value="home">Home &amp; Kitchen</option>
+<option value="beauty">Beauty &amp; Personal Care</option>
+</select>
+</div>
+</div>
+<!-- Pricing & Inventory Section -->
+<div class="grid grid-cols-2 gap-4">
+<div class="flex flex-col gap-2 bg-white dark:bg-gray-900/50 p-4 rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm">
+<label class="text-sm font-medium">Price ($)</label>
+<div class="relative">
+<span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
+<input class="w-full rounded-lg border-gray-200 dark:border-gray-700 bg-white dark:bg-background-dark focus:ring-primary focus:border-primary pl-7 p-3" placeholder="0.00" step="0.01" type="number"/>
+</div>
+</div>
+<div class="flex flex-col gap-2 bg-white dark:bg-gray-900/50 p-4 rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm">
+<label class="text-sm font-medium">Stock Quantity</label>
+<input class="w-full rounded-lg border-gray-200 dark:border-gray-700 bg-white dark:bg-background-dark focus:ring-primary focus:border-primary p-3" placeholder="0" type="number"/>
+</div>
+</div>
+<!-- Description Section -->
+<div class="flex flex-col gap-2 bg-white dark:bg-gray-900/50 p-4 rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm">
+<label class="text-sm font-medium">Description</label>
+<textarea class="w-full rounded-lg border-gray-200 dark:border-gray-700 bg-white dark:bg-background-dark focus:ring-primary focus:border-primary p-3 resize-none" placeholder="Provide a detailed description of the product features, materials, and benefits..." rows="5"></textarea>
+</div>
+<!-- Image Upload Section -->
+<div class="space-y-4 bg-white dark:bg-gray-900/50 p-4 rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm">
+<div class="flex justify-between items-center">
+<h3 class="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Product Images</h3>
+<span class="text-xs text-gray-400">Max 5 images</span>
+</div>
+<div class="flex gap-4 overflow-x-auto pb-2 hide-scrollbar">
+<!-- Image Placeholder/Uploader -->
+<button class="flex-shrink-0 w-32 h-32 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-xl flex flex-col items-center justify-center gap-1 text-primary hover:bg-primary/5 transition-colors" type="button">
+<span class="material-symbols-outlined text-3xl">add_a_photo</span>
+<span class="text-[10px] font-medium uppercase">Add Image</span>
+</button>
+<!-- Mock Uploaded Image 1 -->
+<div class="relative flex-shrink-0 w-32 h-32 rounded-xl overflow-hidden border border-gray-100 dark:border-gray-800 group">
+<img alt="Wireless Headphones Profile" class="w-full h-full object-cover" data-alt="Professional studio shot of wireless headphones" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCWOdHgVYI4mUZjadPEgz3GQ6wzWEwt1YyYWQCf-bpCp1BRARWpuWK8lmDqSK8cha2F_uXvkaF927akpf43qOvafgRkzRSTfw1amrwyoFTc4WaEr_IEOVirTzIZxFBlQQG2qHULeEe3dmoKNGAovfTtCtLQNupHSK9QF_vvpEd0hCGiTXxwloBaLgkOqnCV6kwCX82A_1qAq8cvQtgfYQa7kJcyKh1MkbLt9nmVpKTl0JyptF67rvwe0aphM1Kf7I_zIkDJC4-oS10"/>
+<button class="absolute top-1 right-1 bg-black/50 text-white rounded-full p-1 hover:bg-red-500 transition-colors" type="button">
+<span class="material-symbols-outlined text-sm">close</span>
+</button>
+</div>
+<!-- Mock Uploaded Image 2 -->
+<div class="relative flex-shrink-0 w-32 h-32 rounded-xl overflow-hidden border border-gray-100 dark:border-gray-800 group">
+<img alt="Headphones Detail View" class="w-full h-full object-cover" data-alt="Close up view of headphone cushion padding" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCmC1jcUHAVDizb99CExPXzlRKEiqMNNsYFdi6P5Ky5EqilCbCYGXKtbZJqgAOu_gOlqmbyltV10LFZk6liJIOMT1UWFdNHpQafy5vz5EPy5LL2794bvScKInuOezzGw2tymJoC0VkxIJc3eSOq6a46P1lQHGUaOWDlUxLhGOkuuIFesyTpK6A3jEsXgqpO48j8ojpTPpVPeGkQ8NZTS18oRRLuIHzsXcY44fixWZLa2_v0m85AfDlAbGkFLHotoKSWO-I-Fyk4xoo"/>
+<button class="absolute top-1 right-1 bg-black/50 text-white rounded-full p-1 hover:bg-red-500 transition-colors" type="button">
+<span class="material-symbols-outlined text-sm">close</span>
+</button>
+</div>
+</div>
+<p class="text-xs text-gray-400 italic">Supported formats: JPEG, PNG. Max file size: 5MB per image.</p>
+</div>
+</form>
+</main>
+<!-- Bottom Action Bar -->
+<footer class="fixed bottom-0 left-0 right-0 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md border-t border-gray-200 dark:border-gray-800 p-4">
+<div class="max-w-2xl mx-auto flex gap-4">
+<button class="flex-1 py-4 px-6 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 font-semibold hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                Save Draft
+            </button>
+<button class="flex-[1.5] py-4 px-6 rounded-xl bg-primary text-white font-semibold shadow-lg shadow-primary/20 hover:brightness-110 active:scale-[0.98] transition-all">
+                Publish Product
+            </button>
+</div>
+</footer>
+</body></html>

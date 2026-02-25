@@ -1,0 +1,13 @@
+<%- include('../../partials/head', { title }) %><%- include('../../partials/navbar') %><%- include('../../partials/flash') %>
+<main class="container-max mx-auto px-4 py-6 grid lg:grid-cols-[240px_1fr] gap-6"><%- include('../../partials/admin-nav') %>
+<section class="space-y-6">
+  <h1 class="text-2xl font-extrabold">Gestion catégories</h1>
+  <div class="card p-5">
+    <form action="/admin/categories" method="POST" class="grid md:grid-cols-3 gap-2">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>"><input class="form-input" name="name" placeholder="Nom catégorie"><select class="form-select" name="parentId"><option value="">Sans parent</option><% categories.forEach(c=> { %><option value="<%= c.id %>"><%= c.name %></option><% }) %></select><button class="btn-primary">Créer</button>
+    </form>
+  </div>
+  <div class="card p-5 table-shell"><table><thead><tr><th>Nom</th><th>Slug</th><th>Parent</th><th>Actions</th></tr></thead><tbody>
+  <% categories.forEach(c => { %><tr><td><%= c.name %></td><td><%= c.slug %></td><td><%= c.parentId || '-' %></td><td><form action="/admin/categories/<%= c.id %>" method="POST" class="flex gap-2 items-center"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><input class="form-input" name="name" value="<%= c.name %>"><input class="form-input" name="parentId" value="<%= c.parentId || '' %>"><button class="btn-secondary">Maj</button><button class="btn-secondary" formaction="/admin/categories/<%= c.id %>/delete">Suppr</button></form></td></tr><% }) %>
+  </tbody></table></div>
+</section></main><%- include('../../partials/footer') %>

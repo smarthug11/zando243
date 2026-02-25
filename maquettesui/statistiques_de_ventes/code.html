@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Sales Statistics Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#1969e1",
+                        "background-light": "#f6f7f8",
+                        "background-dark": "#111721",
+                    },
+                    fontFamily: {
+                        "display": ["Inter"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100">
+<div class="relative flex h-auto min-h-screen w-full flex-col overflow-x-hidden">
+<!-- Header Section -->
+<header class="sticky top-0 z-50 flex items-center bg-white dark:bg-background-dark border-b border-slate-200 dark:border-slate-800 p-4 justify-between">
+<div class="text-primary flex size-10 shrink-0 items-center justify-center">
+<span class="material-symbols-outlined text-[28px]">menu</span>
+</div>
+<h1 class="text-lg font-bold leading-tight tracking-tight flex-1 text-center">Sales Statistics</h1>
+<div class="flex w-10 items-center justify-end">
+<button class="flex items-center justify-center rounded-lg h-10 w-10 bg-transparent text-slate-600 dark:text-slate-300">
+<span class="material-symbols-outlined text-[24px]">notifications</span>
+</button>
+</div>
+</header>
+<!-- Main Content -->
+<main class="flex-1 flex flex-col gap-6 pb-24">
+<!-- Date Range Selector -->
+<div class="flex gap-3 px-4 pt-4 overflow-x-auto no-scrollbar">
+<button class="flex h-10 shrink-0 items-center justify-center gap-x-2 rounded-xl bg-slate-200 dark:bg-slate-800 px-4 transition-colors">
+<span class="material-symbols-outlined text-primary text-[20px]">calendar_today</span>
+<p class="text-sm font-semibold">Today</p>
+</button>
+<button class="flex h-10 shrink-0 items-center justify-center gap-x-2 rounded-xl bg-slate-200 dark:bg-slate-800 px-4">
+<span class="material-symbols-outlined text-slate-500 text-[20px]">calendar_month</span>
+<p class="text-sm font-semibold">7 Days</p>
+</button>
+<button class="flex h-10 shrink-0 items-center justify-center gap-x-2 rounded-xl bg-primary px-4 text-white shadow-lg shadow-primary/20">
+<span class="material-symbols-outlined text-white text-[20px]">event_repeat</span>
+<p class="text-sm font-semibold">30 Days</p>
+</button>
+<button class="flex h-10 shrink-0 items-center justify-center gap-x-2 rounded-xl bg-slate-200 dark:bg-slate-800 px-4">
+<span class="material-symbols-outlined text-slate-500 text-[20px]">tune</span>
+<p class="text-sm font-semibold">Custom</p>
+</button>
+</div>
+<!-- KPI Grid -->
+<div class="grid grid-cols-2 gap-4 px-4">
+<div class="flex flex-col gap-2 rounded-xl p-5 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-sm">
+<div class="flex items-center justify-between">
+<span class="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider">Total Revenue</span>
+<span class="material-symbols-outlined text-primary text-[20px]">payments</span>
+</div>
+<p class="tracking-tight text-xl font-bold leading-tight mt-1">$128,430</p>
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-emerald-500 text-[16px]">trending_up</span>
+<p class="text-emerald-500 text-xs font-bold leading-normal">+12.4%</p>
+</div>
+</div>
+<div class="flex flex-col gap-2 rounded-xl p-5 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-sm">
+<div class="flex items-center justify-between">
+<span class="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider">Net Profit</span>
+<span class="material-symbols-outlined text-primary text-[20px]">account_balance_wallet</span>
+</div>
+<p class="tracking-tight text-xl font-bold leading-tight mt-1">$42,150</p>
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-emerald-500 text-[16px]">trending_up</span>
+<p class="text-emerald-500 text-xs font-bold leading-normal">+5.2%</p>
+</div>
+</div>
+<div class="flex flex-col gap-2 rounded-xl p-5 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-sm">
+<div class="flex items-center justify-between">
+<span class="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider">Avg. Order</span>
+<span class="material-symbols-outlined text-primary text-[20px]">shopping_cart</span>
+</div>
+<p class="tracking-tight text-xl font-bold leading-tight mt-1">$85.20</p>
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-rose-500 text-[16px]">trending_down</span>
+<p class="text-rose-500 text-xs font-bold leading-normal">-2.1%</p>
+</div>
+</div>
+<div class="flex flex-col gap-2 rounded-xl p-5 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-sm">
+<div class="flex items-center justify-between">
+<span class="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider">Conversion</span>
+<span class="material-symbols-outlined text-primary text-[20px]">ads_click</span>
+</div>
+<p class="tracking-tight text-xl font-bold leading-tight mt-1">3.4%</p>
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-emerald-500 text-[16px]">trending_up</span>
+<p class="text-emerald-500 text-xs font-bold leading-normal">+0.5%</p>
+</div>
+</div>
+</div>
+<!-- Revenue vs Expenses Chart Card -->
+<div class="px-4">
+<div class="flex flex-col gap-4 rounded-xl p-5 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-sm">
+<div class="flex items-center justify-between">
+<div>
+<h3 class="text-base font-bold">Revenue vs Expenses</h3>
+<p class="text-xs text-slate-500">Performance last 30 days</p>
+</div>
+<div class="flex gap-4">
+<div class="flex items-center gap-1.5">
+<div class="w-2.5 h-2.5 rounded-full bg-primary"></div>
+<span class="text-[10px] font-bold text-slate-500">REV</span>
+</div>
+<div class="flex items-center gap-1.5">
+<div class="w-2.5 h-2.5 rounded-full bg-slate-300"></div>
+<span class="text-[10px] font-bold text-slate-500">EXP</span>
+</div>
+</div>
+</div>
+<div class="h-48 w-full mt-2 relative">
+<svg class="w-full h-full" preserveaspectratio="none" viewbox="0 0 400 150">
+<defs>
+<lineargradient id="gradientRev" x1="0%" x2="0%" y1="0%" y2="100%">
+<stop offset="0%" style="stop-color:#1969e1;stop-opacity:0.2"></stop>
+<stop offset="100%" style="stop-color:#1969e1;stop-opacity:0"></stop>
+</lineargradient>
+</defs>
+<!-- Expenses Line (Gray) -->
+<path d="M0,130 Q50,120 100,125 T200,110 T300,115 T400,100" fill="none" stroke="#cbd5e1" stroke-width="2"></path>
+<!-- Revenue Area & Line -->
+<path d="M0,150 L0,110 Q50,90 100,105 T200,60 T300,80 T400,40 L400,150 Z" fill="url(#gradientRev)"></path>
+<path d="M0,110 Q50,90 100,105 T200,60 T300,80 T400,40" fill="none" stroke="#1969e1" stroke-linecap="round" stroke-width="3"></path>
+</svg>
+<div class="flex justify-between mt-2">
+<p class="text-[10px] font-bold text-slate-400">MAY 01</p>
+<p class="text-[10px] font-bold text-slate-400">MAY 15</p>
+<p class="text-[10px] font-bold text-slate-400">MAY 30</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Sales by Category -->
+<div class="px-4">
+<div class="flex flex-col gap-4 rounded-xl p-5 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-sm">
+<h3 class="text-base font-bold">Sales by Category</h3>
+<div class="flex flex-col gap-4">
+<div class="flex flex-col gap-1.5">
+<div class="flex justify-between text-xs font-semibold">
+<span>Electronics</span>
+<span class="text-primary">40%</span>
+</div>
+<div class="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+<div class="h-full bg-primary rounded-full w-[40%]"></div>
+</div>
+</div>
+<div class="flex flex-col gap-1.5">
+<div class="flex justify-between text-xs font-semibold">
+<span>Fashion</span>
+<span class="text-primary">30%</span>
+</div>
+<div class="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+<div class="h-full bg-primary/70 rounded-full w-[30%]"></div>
+</div>
+</div>
+<div class="flex flex-col gap-1.5">
+<div class="flex justify-between text-xs font-semibold">
+<span>Home &amp; Living</span>
+<span class="text-primary">20%</span>
+</div>
+<div class="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+<div class="h-full bg-primary/40 rounded-full w-[20%]"></div>
+</div>
+</div>
+<div class="flex flex-col gap-1.5">
+<div class="flex justify-between text-xs font-semibold">
+<span>Others</span>
+<span class="text-primary">10%</span>
+</div>
+<div class="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+<div class="h-full bg-slate-300 dark:bg-slate-700 rounded-full w-[10%]"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Top Selling Products -->
+<div class="px-4">
+<div class="flex flex-col gap-4 rounded-xl p-5 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-sm">
+<div class="flex items-center justify-between mb-2">
+<h3 class="text-base font-bold">Top Products</h3>
+<button class="text-primary text-xs font-bold">View All</button>
+</div>
+<div class="flex flex-col gap-5">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-lg bg-slate-100 dark:bg-slate-800 overflow-hidden shrink-0">
+<img class="w-full h-full object-cover" data-alt="Wireless noise cancelling headphones over ear" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCA5W2LB8TxL4B8V-RBpYPhJrq0lzl4kUaeOHJ838LbbJQZI4_5CzVNcZc-nPAE-9dAIrF0-k16ab_D2pmWKw1r3u7osHgXzVuKfBg9fTT_CDIfoZTYiBcDMWERJtVkNs1--M2Slr1Cs9CTdaq5Zzm4ZrKz0igvXMTuJ1IjT9R4oWPvZ1fQq0f3gfc_ujHHrgb7SHFzXHxpKIM9JdXdUQVRgoKnStUia5izB2d1WGBHIHNCcCJdgtSNKoPVxY58nSJ0T23ValbsFS0"/>
+</div>
+<div class="flex-1 min-w-0">
+<p class="text-sm font-bold truncate">Wireless Earbuds Pro</p>
+<p class="text-[11px] text-slate-500">1,240 units sold</p>
+</div>
+<div class="text-right shrink-0">
+<p class="text-sm font-bold">$24,800</p>
+<p class="text-[10px] text-emerald-500 font-bold">+8%</p>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-lg bg-slate-100 dark:bg-slate-800 overflow-hidden shrink-0">
+<img class="w-full h-full object-cover" data-alt="Classic minimal black athletic shoes" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAjJfWToRUZAuT1qLhtEEKyTg1dXZM3Ey82fm3TYMWjzOh8J80eqa3_S3L2aJWumYLnPX6rVQY_dMCkKbXUKy_iznFEZMuxL9Z1i9jLqt57Q3-VD6rtfW7USe_FUAWWlfoxhFnvio4QHQeHAh2fecQoL4776ifVWmOat2BIH69BAvCVUzfcGZFTFbdgF2Z0ghhCEumGTcwsIy3GKnKc375SlkVfVo05QqqXYq29of0taQloojckdznoRo1lA_u_20eC5G56Hqs3BJ8"/>
+</div>
+<div class="flex-1 min-w-0">
+<p class="text-sm font-bold truncate">Summer Silk Dress</p>
+<p class="text-[11px] text-slate-500">890 units sold</p>
+</div>
+<div class="text-right shrink-0">
+<p class="text-sm font-bold">$18,250</p>
+<p class="text-[10px] text-emerald-500 font-bold">+12%</p>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-lg bg-slate-100 dark:bg-slate-800 overflow-hidden shrink-0">
+<img class="w-full h-full object-cover" data-alt="Smart home voice controlled assistant hub" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDZoJiZgsHZfuKfJujhCp6D1B833-1L5bKXpkCkskwdf8Oq73ekN1ro1JkC0YFPSs24P1dcDXRPu-V5NP_zzT3DCpaoy4H5mm22Dnpy9FKQvmN6lPJgsPC_Q45lk2NcmiIBKFz68Rpd4K0-USkSy4nrRyxXL964Juhyxajur0L-uK89mU3F98feZ0bTD7-12WqYYrBhCQWEu8W2emOQTMaaIcL_kwKj5VU7-RodghohejNFGqKUoONW0DT0_DYm7ULzcJzlKeEq-8M"/>
+</div>
+<div class="flex-1 min-w-0">
+<p class="text-sm font-bold truncate">Smart Home Hub</p>
+<p class="text-[11px] text-slate-500">540 units sold</p>
+</div>
+<div class="text-right shrink-0">
+<p class="text-sm font-bold">$15,900</p>
+<p class="text-[10px] text-rose-500 font-bold">-2%</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Bottom Navigation Bar -->
+<nav class="fixed bottom-0 left-0 right-0 flex border-t border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-background-dark/95 backdrop-blur-md px-4 pb-6 pt-3 z-50">
+<a class="flex flex-1 flex-col items-center justify-center gap-1 text-primary" href="#">
+<span class="material-symbols-outlined text-[24px]">dashboard</span>
+<p class="text-[10px] font-bold leading-normal">Dashboard</p>
+</a>
+<a class="flex flex-1 flex-col items-center justify-center gap-1 text-slate-400" href="#">
+<span class="material-symbols-outlined text-[24px]">shopping_bag</span>
+<p class="text-[10px] font-medium leading-normal">Orders</p>
+</a>
+<a class="flex flex-1 flex-col items-center justify-center gap-1 text-slate-400" href="#">
+<span class="material-symbols-outlined text-[24px]">inventory_2</span>
+<p class="text-[10px] font-medium leading-normal">Products</p>
+</a>
+<a class="flex flex-1 flex-col items-center justify-center gap-1 text-slate-400" href="#">
+<span class="material-symbols-outlined text-[24px]">group</span>
+<p class="text-[10px] font-medium leading-normal">Customers</p>
+</a>
+<a class="flex flex-1 flex-col items-center justify-center gap-1 text-slate-400" href="#">
+<span class="material-symbols-outlined text-[24px]">settings</span>
+<p class="text-[10px] font-medium leading-normal">Settings</p>
+</a>
+</nav>
+</div>
+</body></html>

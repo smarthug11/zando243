@@ -1,0 +1,11 @@
+<%- include('../../partials/head', { title }) %><%- include('../../partials/navbar') %><%- include('../../partials/flash') %>
+<main class="container-max mx-auto px-4 py-6 grid lg:grid-cols-[240px_1fr] gap-6"><%- include('../../partials/admin-nav') %>
+<section class="space-y-6">
+  <div class="card p-5">
+    <h1 class="text-2xl font-extrabold mb-4">Coupons / Promotions</h1>
+    <form action="/admin/coupons" method="POST" class="grid md:grid-cols-4 gap-2">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>"><input class="form-input" name="code" placeholder="Code"><select class="form-select" name="type"><option>PERCENT</option><option>FIXED</option></select><input class="form-input" name="value" type="number" step="0.01" placeholder="Valeur"><input class="form-input" name="minCart" type="number" step="0.01" placeholder="Min panier"><input class="form-input" name="maxDiscount" type="number" step="0.01" placeholder="Max discount"><input class="form-input" name="usageLimit" type="number" placeholder="Usage limit"><input class="form-input" name="usagePerUser" type="number" value="1" placeholder="Par user"><input class="form-input" name="startAt" type="datetime-local"><input class="form-input" name="endAt" type="datetime-local"><label class="flex items-center gap-2"><input type="checkbox" name="isActive" value="1" checked> Actif</label><button class="btn-primary">Créer</button>
+    </form>
+  </div>
+  <div class="card p-5 table-shell"><table><thead><tr><th>Code</th><th>Type</th><th>Valeur</th><th>Fenêtre</th><th>Usage</th><th>Actif</th></tr></thead><tbody><% coupons.forEach(c=> { %><tr><td><%= c.code %></td><td><%= c.type %></td><td><%= c.value %></td><td><%= new Date(c.startAt).toLocaleDateString('fr-FR') %> → <%= new Date(c.endAt).toLocaleDateString('fr-FR') %></td><td><%= c.usageCount %>/<%= c.usageLimit || '∞' %></td><td><%= c.isActive ? 'Oui' : 'Non' %></td></tr><% }) %></tbody></table></div>
+</section></main><%- include('../../partials/footer') %>

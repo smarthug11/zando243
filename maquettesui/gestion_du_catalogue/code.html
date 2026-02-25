@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Inventory Management Admin</title>
+<!-- Tailwind CSS with Plugins -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Material Symbols Outlined -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Google Fonts: Inter -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "primary": "#1969e1",
+              "background-light": "#f6f7f8",
+              "background-dark": "#111721",
+            },
+            fontFamily: {
+              "display": ["Inter", "sans-serif"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            line-height: 1;
+            text-transform: none;
+            letter-spacing: normal;
+            word-wrap: normal;
+            white-space: nowrap;
+            direction: ltr;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark text-[#111418] font-display min-h-screen flex flex-col">
+<!-- Top Header -->
+<header class="sticky top-0 z-10 bg-white border-b border-primary/10 px-4 py-4 flex items-center justify-between">
+<div class="flex items-center gap-3">
+<div class="bg-primary/10 p-2 rounded-lg text-primary">
+<span class="material-symbols-outlined">inventory_2</span>
+</div>
+<h1 class="text-xl font-bold tracking-tight">Inventory</h1>
+</div>
+<button class="bg-primary hover:bg-primary/90 text-white flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-colors shadow-sm">
+<span class="material-symbols-outlined !text-[20px]">add</span>
+<span class="hidden sm:inline">Add Product</span>
+</button>
+</header>
+<!-- Main Content Area -->
+<main class="flex-1 overflow-y-auto pb-20">
+<!-- Search & Quick Metrics -->
+<section class="p-4 space-y-4">
+<!-- Search Bar -->
+<div class="relative">
+<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+<span class="material-symbols-outlined">search</span>
+</div>
+<input class="block w-full pl-10 pr-4 py-3 bg-white border border-primary/10 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary placeholder-slate-400 text-sm shadow-sm" placeholder="Search by product name or SKU..." type="text"/>
+</div>
+<!-- Horizontal Metrics Scroll -->
+<div class="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 no-scrollbar">
+<div class="flex-none min-w-[120px] bg-white p-4 rounded-xl border border-primary/5 shadow-sm">
+<p class="text-xs text-slate-500 font-medium">Total Items</p>
+<p class="text-xl font-bold mt-1 text-primary">1,248</p>
+</div>
+<div class="flex-none min-w-[120px] bg-white p-4 rounded-xl border border-primary/5 shadow-sm">
+<p class="text-xs text-slate-500 font-medium">Low Stock</p>
+<p class="text-xl font-bold mt-1 text-amber-500">12</p>
+</div>
+<div class="flex-none min-w-[120px] bg-white p-4 rounded-xl border border-primary/5 shadow-sm">
+<p class="text-xs text-slate-500 font-medium">Out of Stock</p>
+<p class="text-xl font-bold mt-1 text-rose-500">4</p>
+</div>
+<div class="flex-none min-w-[120px] bg-white p-4 rounded-xl border border-primary/5 shadow-sm">
+<p class="text-xs text-slate-500 font-medium">Active</p>
+<p class="text-xl font-bold mt-1 text-emerald-500">1,232</p>
+</div>
+</div>
+</section>
+<!-- Filters Tabs -->
+<div class="px-4 mb-4">
+<div class="flex gap-2">
+<button class="px-4 py-1.5 rounded-full bg-primary text-white text-sm font-medium">All</button>
+<button class="px-4 py-1.5 rounded-full bg-white border border-primary/10 text-slate-600 text-sm font-medium">Low Stock</button>
+<button class="px-4 py-1.5 rounded-full bg-white border border-primary/10 text-slate-600 text-sm font-medium">Inactive</button>
+</div>
+</div>
+<!-- Product List -->
+<section class="px-4 space-y-3">
+<!-- Product Card 1 -->
+<div class="bg-white rounded-xl border border-primary/5 shadow-sm p-4 flex gap-4 items-center">
+<div class="size-16 rounded-lg bg-slate-100 flex-none overflow-hidden">
+<img alt="Product" class="w-full h-full object-cover" data-alt="Red athletic sneaker on plain background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDZ1CwvES5vm6NEUOZiWnGpuHDe_hO4Fb0ft3UM8qol40p7ZPla8jyePSoZWKYwQUvy9E1E1CHTc4cvSQmdNDGwizNKPVXaZuVq4hnKle7OK0aEbLUQBwsOId8g93ISX6C4twf7Jrk0eCtl5yV6PTRNv7eE-yZYthPlFTdc21gTrfRhtkcjRKwi-ZkZ-9PQG-WEeK9X2Rs64JkTCxW7mr8s-Mh2Nwh3dHpBWhXQUxZVh0ore7lBrbHYbWIi3kWcuhB6RHRKmGkpUHM"/>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex justify-between items-start">
+<h3 class="font-bold text-slate-900 truncate">VaporMax Flyknit 3</h3>
+<button class="text-slate-400 p-1">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+<p class="text-xs text-slate-500 mb-2">SKU: NIKE-VM3-RED</p>
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-3">
+<span class="text-sm font-bold text-primary">$189.00</span>
+<span class="flex items-center gap-1 text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
+<span class="material-symbols-outlined !text-[12px]">check_circle</span> ACTIVE
+                            </span>
+</div>
+<div class="text-right">
+<p class="text-[10px] text-slate-400 uppercase font-semibold">Stock</p>
+<p class="text-sm font-bold">42 units</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Product Card 2 (Low Stock) -->
+<div class="bg-white rounded-xl border border-primary/5 shadow-sm p-4 flex gap-4 items-center">
+<div class="size-16 rounded-lg bg-slate-100 flex-none overflow-hidden">
+<img alt="Product" class="w-full h-full object-cover" data-alt="Modern white minimalist watch" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDSlChvkgurnEpQ0Ct3DUGUw7qeJMDfdoNDik96kEs177ld3IgIJqnZimvg1gcL9uAXY0OXDfctiZgYl9M4E5ZuA17xhMoH_slvIY1n72LVCB6Fd1Eda9Ow8A0y-7JFD52dFYz-_eH3msVdUZUhI9JrdYqQJlq1l4KEOfBANnmK81MGk-ApmQnnOSuBguigEQrLMu5xPbrw6DVyr76aRFBn_faY7Q0yPCM6MKBtIJuC0c1oxjMDyBl8SPbwoIwH7LcDp6f-vo9ig3Q"/>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex justify-between items-start">
+<h3 class="font-bold text-slate-900 truncate">Minimalist Slate Watch</h3>
+<button class="text-slate-400 p-1">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+<p class="text-xs text-slate-500 mb-2">SKU: WCH-SLT-04</p>
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-3">
+<span class="text-sm font-bold text-primary">$120.00</span>
+<span class="flex items-center gap-1 text-[11px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
+<span class="material-symbols-outlined !text-[12px]">warning</span> LOW STOCK
+                            </span>
+</div>
+<div class="text-right">
+<p class="text-[10px] text-slate-400 uppercase font-semibold">Stock</p>
+<p class="text-sm font-bold text-amber-600">3 units</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Product Card 3 (Out of Stock) -->
+<div class="bg-white rounded-xl border border-primary/5 shadow-sm p-4 flex gap-4 items-center opacity-75">
+<div class="size-16 rounded-lg bg-slate-100 flex-none overflow-hidden grayscale">
+<img alt="Product" class="w-full h-full object-cover" data-alt="Studio quality wireless black headphones" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD9FeOTcwsJqq4qEOCVJUCVSg1HY0g9pFwfdmwliIVR9FyknnBIWhwP-SfS_eJJhgB4l8peJCdZ59nNOtNzkhcdgbAj6XWu4IsgeVONeMsBWZq7E1xIenMBzgiTKLw7rXVzJ61ofpaVk9YIAwYmMaCFQl4F09JaucrwV-VaHnZbgbfJiOnjbHb8ayVAcvM6xt-PdcrN1kIOOkzozSp5hMVeicO6Oz-uGfUIRsV7kF1m3FXLqh9H57pERq2vrexXGzWc95MRnYOZtEw"/>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex justify-between items-start">
+<h3 class="font-bold text-slate-900 truncate">Studio Wireless Pro</h3>
+<button class="text-slate-400 p-1">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+<p class="text-xs text-slate-500 mb-2">SKU: AUD-SWP-BLK</p>
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-3">
+<span class="text-sm font-bold text-primary">$299.00</span>
+<span class="flex items-center gap-1 text-[11px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full">
+<span class="material-symbols-outlined !text-[12px]">cancel</span> OUT OF STOCK
+                            </span>
+</div>
+<div class="text-right">
+<p class="text-[10px] text-slate-400 uppercase font-semibold">Stock</p>
+<p class="text-sm font-bold text-rose-600">0 units</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Product Card 4 -->
+<div class="bg-white rounded-xl border border-primary/5 shadow-sm p-4 flex gap-4 items-center">
+<div class="size-16 rounded-lg bg-slate-100 flex-none overflow-hidden">
+<img alt="Product" class="w-full h-full object-cover" data-alt="Modern high-back office chair" src="https://lh3.googleusercontent.com/aida-public/AB6AXuASjpZfXsHtgEouZyyUG7rq5t4RHYqNGHOFT1zyBhFzoQnFCcY2N9faLdmiVVdH98GmudB6N3Bm0kE8uqkTX4LJQF0S_auxwotq4XCnkYYHizHbgO71-_8AkUb9lmOS8GsrTajPbyJ7cTBr3BZnnIGZUcEzBksQReTWnUUr425ikrb2TqQzelQVoAcPUOzgx0sDx6QngdsspBvfbJRvs8nlLy409RBJUIlx8fmfhpOe82ATqdX6AX5Q5CPOC500sy8ktalCQVlUqMo"/>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex justify-between items-start">
+<h3 class="font-bold text-slate-900 truncate">ErgoComfort Pro Chair</h3>
+<button class="text-slate-400 p-1">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+<p class="text-xs text-slate-500 mb-2">SKU: FUR-ERG-GRY</p>
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-3">
+<span class="text-sm font-bold text-primary">$450.00</span>
+<span class="flex items-center gap-1 text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
+<span class="material-symbols-outlined !text-[12px]">check_circle</span> ACTIVE
+                            </span>
+</div>
+<div class="text-right">
+<p class="text-[10px] text-slate-400 uppercase font-semibold">Stock</p>
+<p class="text-sm font-bold">18 units</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Product Card 5 -->
+<div class="bg-white rounded-xl border border-primary/5 shadow-sm p-4 flex gap-4 items-center">
+<div class="size-16 rounded-lg bg-slate-100 flex-none overflow-hidden">
+<img alt="Product" class="w-full h-full object-cover" data-alt="Vintage style analog camera" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDI0ZptvM22vGmVwSu60RrUE4lDH_roQ0veo8EyoINFPNsy2rWMe8UbcYFYbm-anvNGB6wITmHGNqIE6Y0VbmwBKgwh8uA-hTqJ7TKAlQLokSk_ez3vfDq4r3_sxR-4t3q6Re8QSW5MtA4Q9vSvnJ0wkvKdcaHtK_d612sXr6hkQwzsMzJZiJjrtdCN-qgY1SlR5mUXmKQiccXEzRzWUyQ-K9E2JxPmEaFWz_ZOEBwFTIMYNI-RHp9AGwrW4HSdJQ79P2MsdbnpMZM"/>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex justify-between items-start">
+<h3 class="font-bold text-slate-900 truncate">Retro Cam X100</h3>
+<button class="text-slate-400 p-1">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+<p class="text-xs text-slate-500 mb-2">SKU: CAM-RTX-100</p>
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-3">
+<span class="text-sm font-bold text-primary">$899.00</span>
+<span class="flex items-center gap-1 text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
+<span class="material-symbols-outlined !text-[12px]">check_circle</span> ACTIVE
+                            </span>
+</div>
+<div class="text-right">
+<p class="text-[10px] text-slate-400 uppercase font-semibold">Stock</p>
+<p class="text-sm font-bold">12 units</p>
+</div>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- Bottom Navbar -->
+<nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 flex justify-around items-center px-4 py-3 z-20">
+<a class="flex flex-col items-center gap-1 text-slate-400" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="text-[10px] font-medium">Overview</span>
+</a>
+<a class="flex flex-col items-center gap-1 text-primary" href="#">
+<span class="material-symbols-outlined font-fill-1">inventory_2</span>
+<span class="text-[10px] font-bold">Inventory</span>
+</a>
+<a class="flex flex-col items-center gap-1 text-slate-400" href="#">
+<span class="material-symbols-outlined">shopping_cart</span>
+<span class="text-[10px] font-medium">Orders</span>
+</a>
+<a class="flex flex-col items-center gap-1 text-slate-400" href="#">
+<span class="material-symbols-outlined">group</span>
+<span class="text-[10px] font-medium">Customers</span>
+</a>
+<a class="flex flex-col items-center gap-1 text-slate-400" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="text-[10px] font-medium">Settings</span>
+</a>
+</nav>
+<!-- FAB (Alternative thumb reach button) -->
+<div class="fixed bottom-24 right-6 sm:hidden">
+<button class="size-14 bg-primary text-white rounded-full shadow-lg flex items-center justify-center hover:scale-105 active:scale-95 transition-transform">
+<span class="material-symbols-outlined !text-[32px]">add</span>
+</button>
+</div>
+</body></html>

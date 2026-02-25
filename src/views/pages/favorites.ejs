@@ -1,0 +1,27 @@
+<%- include('../partials/head', { title }) %>
+<%- include('../partials/navbar') %>
+<%- include('../partials/flash') %>
+<main class="container-max mx-auto px-4 py-6">
+  <h1 class="text-2xl font-extrabold mb-4">Mes favoris</h1>
+  <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <% favorites.forEach(f => { const p=f.product; const img=(p?.images||[]).find(i=>i.isMain)||(p?.images||[])[0]; %>
+      <div class="card p-3">
+        <img class="w-full aspect-square rounded-xl object-cover bg-slate-100" src="<%= img?.url || 'https://via.placeholder.com/400' %>">
+        <div class="mt-2 font-semibold line-clamp-2"><%= p?.name %></div>
+        <div class="text-sm text-blue-700 font-bold">$<%= p?.finalPrice %></div>
+        <div class="flex gap-2 mt-3">
+          <form action="/favorites/<%= p.id %>/move-to-cart" method="POST" class="flex-1">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <button class="btn-primary w-full" type="submit">Vers panier</button>
+          </form>
+          <form action="/favorites/<%= p.id %>/delete" method="POST">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <button class="btn-secondary" type="submit">Retirer</button>
+          </form>
+        </div>
+      </div>
+    <% }) %>
+  </div>
+  <% if (!favorites.length) { %><div class="card p-6 text-slate-500 mt-4">Aucun favori.</div><% } %>
+</main>
+<%- include('../partials/footer') %>

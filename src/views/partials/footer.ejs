@@ -1,0 +1,13 @@
+<footer class="mt-12 border-t border-slate-200 bg-white">
+  <% const _app = (typeof app !== 'undefined' && app) ? app : { name: 'Zando243' }; %>
+  <div class="container-max mx-auto px-4 py-8 grid md:grid-cols-4 gap-6 text-sm text-slate-600">
+    <div>
+      <div class="font-bold text-slate-900 mb-2"><%= _app.name %></div>
+      <p>Marketplace SSR Express/EJS avec panier, commandes, favoris, avis, support et admin.</p>
+    </div>
+    <div><a href="/products" class="block">Produits</a><a href="/favorites" class="block">Favoris</a><a href="/orders" class="block">Commandes</a></div>
+    <div><a href="/tickets" class="block">Support</a><a href="/sitemap.xml" class="block">Sitemap</a><a href="/robots.txt" class="block">Robots</a></div>
+    <div class="text-xs">RequestId: <%= typeof requestId !== 'undefined' ? requestId : '' %></div>
+  </div>
+</footer>
+</body></html>
