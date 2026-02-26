@@ -11,7 +11,7 @@
           <img class="w-24 h-24 rounded-xl object-cover bg-slate-100" src="<%= img?.url || 'https://via.placeholder.com/200' %>">
           <div class="flex-1">
             <div class="font-semibold"><%= p?.name %></div>
-            <div class="text-xs text-slate-500">SKU: <%= p?.sku %> • Stock: <%= p?.stock %></div>
+            <div class="text-xs text-slate-500">SKU: <%= p?.sku %> - Stock: <%= p?.stock %></div>
             <div class="text-sm text-blue-700 font-bold mt-1">$<%= p?.finalPrice %></div>
             <div class="flex gap-2 mt-2">
               <form action="/cart/items/<%= item.id %>" method="POST" class="flex gap-2">
@@ -34,10 +34,10 @@
       <% if (!activeItems.length) { %><div class="card p-6 text-slate-500">Votre panier est vide.</div><% } %>
     </div>
     <div class="card p-4">
-      <h2 class="font-bold mb-3">Sauvegardé pour plus tard</h2>
+      <h2 class="font-bold mb-3">Sauvegarde pour plus tard</h2>
       <div class="space-y-2">
         <% savedItems.forEach(item => { %><div class="text-sm"><%= item.product?.name %> (x<%= item.qty %>)</div><% }) %>
-        <% if (!savedItems.length) { %><div class="text-sm text-slate-500">Aucun article sauvegardé.</div><% } %>
+        <% if (!savedItems.length) { %><div class="text-sm text-slate-500">Aucun article sauvegarde.</div><% } %>
       </div>
     </div>
   </section>
@@ -49,28 +49,38 @@
       data-door-fee="5.00">
       <div class="flex justify-between"><span>Sous-total</span><strong id="summarySubtotal">$<%= Number(totals.subtotal || 0).toFixed(2) %></strong></div>
       <div class="flex justify-between"><span>Livraison (choix au checkout)</span><strong id="summaryShipping">$0.00 / $5.00</strong></div>
-      <div class="flex justify-between"><span>Réduction</span><strong id="summaryDiscount">$0.00</strong></div>
+      <div class="flex justify-between"><span>Reduction</span><strong id="summaryDiscount">$0.00</strong></div>
       <div class="border-t pt-3 mt-3">
         <div class="flex justify-between items-center">
           <span class="text-base font-semibold">Total</span>
           <strong id="summaryTotal" class="text-2xl text-blue-700">$<%= Number(totals.total || totals.subtotal || 0).toFixed(2) %></strong>
         </div>
-        <div class="text-xs text-slate-500 mt-1">Total estimatif mis à jour selon la livraison à la porte (et remises calculées si appliquées).</div>
+        <div class="text-xs text-slate-500 mt-1">Total estimatif mis a jour selon la livraison a la porte et les remises.</div>
       </div>
     </div>
     <% if (auth.user) { %>
     <form action="/cart/checkout" method="POST" class="mt-4 space-y-3">
       <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-      <div>
-        <label class="block text-sm font-medium mb-1">Adresse de destination</label>
+      <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+        <div class="text-sm font-semibold text-slate-900">Adresse de retrait par defaut</div>
+        <div class="mt-2 text-sm text-slate-700">
+          <div class="font-semibold"><%= pickupOfficeAddress.label %></div>
+          <div><%= [pickupOfficeAddress.number, pickupOfficeAddress.street].filter(Boolean).join(' ') %></div>
+          <div><%= [pickupOfficeAddress.neighborhood, pickupOfficeAddress.municipality, pickupOfficeAddress.city, pickupOfficeAddress.country].filter(Boolean).join(', ') %></div>
+        </div>
+        <div class="mt-2 text-xs text-slate-500">Cette adresse est utilisee tant que la livraison a la porte n'est pas activee.</div>
+      </div>
+
+      <div id="doorDeliveryAddressSection" class="hidden space-y-2">
+        <label class="block text-sm font-medium mb-1">Adresse de destination pour livraison a la porte</label>
         <% if ((addresses||[]).length) { %>
           <div class="space-y-2 max-h-56 overflow-auto pr-1">
             <% addresses.forEach((a, idx) => { %>
               <label class="block border rounded-xl p-3 cursor-pointer hover:border-blue-300">
                 <div class="flex items-start gap-2">
-                  <input type="radio" name="addressId" value="<%= a.id %>" <%= (a.isDefault || idx===0) ? 'checked' : '' %> required>
+                  <input class="door-address-radio" type="radio" name="addressId" value="<%= a.id %>" <%= (a.isDefault || idx===0) ? 'checked' : '' %>>
                   <div class="text-sm">
-                    <div class="font-semibold"><%= a.label %> <%= a.isDefault ? '(Défaut)' : '' %></div>
+                    <div class="font-semibold"><%= a.label %> <%= a.isDefault ? '(Defaut)' : '' %></div>
                     <div><%= [a.number, a.street].filter(Boolean).join(' ') %></div>
                     <div><%= [a.neighborhood, a.municipality, a.city, a.country].filter(Boolean).join(', ') %></div>
                   </div>
@@ -80,17 +90,18 @@
           </div>
         <% } else { %>
           <div class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-            Aucune adresse enregistrée. Ajoutez une adresse ci-dessous pour continuer.
+            Aucune adresse enregistree. Ajoutez-en une ci-dessous pour activer la livraison a la porte.
           </div>
         <% } %>
       </div>
+
       <input class="form-input" name="couponCode" placeholder="Coupon (ex: FIXED5)">
       <select class="form-select" name="paymentMethod">
         <option value="CASH_ON_DELIVERY">Cash on delivery</option>
         <option value="CARD">Carte (stub)</option>
         <option value="MOBILE_MONEY">Mobile Money (stub)</option>
       </select>
-      <label class="flex items-center gap-2 text-sm"><input id="doorDeliveryCheckbox" type="checkbox" name="doorDelivery" value="1"> Livraison à la porte (+$5)</label>
+      <label class="flex items-center gap-2 text-sm"><input id="doorDeliveryCheckbox" type="checkbox" name="doorDelivery" value="1"> Livraison a la porte (+$5)</label>
       <button class="btn-primary w-full" type="submit">Valider la commande</button>
     </form>
 
@@ -100,7 +111,7 @@
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <input class="form-input" name="label" placeholder="Label (Maison, Bureau...)" required>
         <div class="grid grid-cols-2 gap-2">
-          <input class="form-input" name="number" placeholder="Numéro">
+          <input class="form-input" name="number" placeholder="Numero">
           <input class="form-input" name="street" placeholder="Rue" required>
         </div>
         <div class="grid grid-cols-2 gap-2">
@@ -111,8 +122,8 @@
           <input class="form-input" name="city" placeholder="Ville" required>
           <input class="form-input" name="country" placeholder="Pays" value="RDC" required>
         </div>
-        <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="isDefault" value="1"> Définir comme adresse par défaut</label>
-        <button class="btn-secondary" type="submit">Ajouter l’adresse</button>
+        <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="isDefault" value="1"> Definir comme adresse par defaut</label>
+        <button class="btn-secondary" type="submit">Ajouter l'adresse</button>
       </form>
     </details>
     <% } else { %>
@@ -131,6 +142,8 @@
     const shippingEl = document.getElementById('summaryShipping');
     const discountEl = document.getElementById('summaryDiscount');
     const totalEl = document.getElementById('summaryTotal');
+    const addressSection = document.getElementById('doorDeliveryAddressSection');
+    const addressInputs = Array.from(document.querySelectorAll('.door-address-radio'));
 
     const toNum = (v) => Number(v || 0);
     const fmt = (n) => `$${toNum(n).toFixed(2)}`;
@@ -145,6 +158,12 @@
       if (shippingEl) shippingEl.textContent = `${fmt(doorFee)} / ${fmt(toNum(summary.dataset.doorFee))}`;
       if (discountEl) discountEl.textContent = fmt(discount);
       if (totalEl) totalEl.textContent = fmt(total);
+      if (addressSection) {
+        addressSection.classList.toggle('hidden', !doorCheckbox.checked);
+      }
+      addressInputs.forEach((input) => {
+        input.required = doorCheckbox.checked;
+      });
     }
 
     doorCheckbox.addEventListener('change', recalc);

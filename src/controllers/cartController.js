@@ -5,13 +5,14 @@ const cartService = require("../services/cartService");
 const orderService = require("../services/orderService");
 const { setFlash } = require("../middlewares/viewLocals");
 const { defineModels } = require("../models");
+const { env } = require("../config/env");
 
 defineModels();
 
 const cartItemValidators = [body("productId").isUUID(), body("qty").optional().isInt({ min: 1, max: 99 }), handleValidation];
 const checkoutValidators = [
   body("paymentMethod").isIn(["CASH_ON_DELIVERY", "CARD", "MOBILE_MONEY"]),
-  body("addressId").isUUID(),
+  body("addressId").optional({ checkFalsy: true }).isUUID(),
   handleValidation
 ];
 const checkoutAddressValidators = [
@@ -28,18 +29,23 @@ const showCart = asyncHandler(async (req, res) => {
   const addresses = req.user
     ? await models.Address.findAll({ where: { userId: req.user.id }, order: [["isDefault", "DESC"], ["createdAt", "DESC"]] })
     : [];
+
   res.render("pages/cart", {
     title: "Panier",
     cart,
     totals: cartService.computeCartTotals(cart),
-    addresses
+    addresses,
+    pickupOfficeAddress: env.pickupOfficeAddress
   });
 });
 
 const addCartItem = asyncHandler(async (req, res) => {
   await cartService.addItem(req, req.body);
-  setFlash(req, "success", "Article ajouté au panier.");
-  res.redirect(req.get("referer") || "/cart");
+  setFlash(req, "success", "Article ajoute au panier.");
+  if (req.body.redirectTo === "cart") {
+    return res.redirect("/cart");
+  }
+  res.redirect(req.get("referer") || "/products");
 });
 
 const updateCartItem = asyncHandler(async (req, res) => {
@@ -59,7 +65,7 @@ const saveForLater = asyncHandler(async (req, res) => {
 
 const checkout = asyncHandler(async (req, res) => {
   if (!req.user) {
-    setFlash(req, "error", "Connectez-vous pour finaliser le paiement. Votre panier invité est conservé.");
+    setFlash(req, "error", "Connectez-vous pour finaliser le paiement. Votre panier invite est conserve.");
     return res.redirect("/auth/login");
   }
   const order = await orderService.createOrderFromCart(req, {
@@ -68,7 +74,7 @@ const checkout = asyncHandler(async (req, res) => {
     doorDelivery: req.body.doorDelivery === "1",
     addressId: req.body.addressId
   });
-  setFlash(req, "success", `Commande ${order.orderNumber} créée.`);
+  setFlash(req, "success", `Commande ${order.orderNumber} creee.`);
   res.redirect(`/orders/${order.id}`);
 });
 
@@ -92,7 +98,7 @@ const createCheckoutAddress = asyncHandler(async (req, res) => {
     country: req.body.country,
     isDefault: req.body.isDefault === "1"
   });
-  setFlash(req, "success", "Adresse ajoutée pour la commande.");
+  setFlash(req, "success", "Adresse ajoutee pour la commande.");
   res.redirect("/cart");
 });
 

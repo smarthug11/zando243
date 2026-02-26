@@ -40,6 +40,15 @@ const env = {
     user: process.env.SMTP_USER || "",
     pass: process.env.SMTP_PASS || "",
     from: process.env.SMTP_FROM || "Zando243 <no-reply@zando243.local>"
+  },
+  pickupOfficeAddress: {
+    label: process.env.PICKUP_OFFICE_LABEL || "Bureau Zando243 Kinshasa",
+    number: process.env.PICKUP_OFFICE_NUMBER || "17B",
+    street: process.env.PICKUP_OFFICE_STREET || "Avenue Colonel Ebeya",
+    neighborhood: process.env.PICKUP_OFFICE_NEIGHBORHOOD || "Gombe",
+    municipality: process.env.PICKUP_OFFICE_MUNICIPALITY || "Gombe",
+    city: process.env.PICKUP_OFFICE_CITY || "Kinshasa",
+    country: process.env.PICKUP_OFFICE_COUNTRY || "RDC"
   }
 };
 

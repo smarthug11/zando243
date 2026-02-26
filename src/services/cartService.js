@@ -123,6 +123,24 @@ async function mergeGuestCartIntoUser(req, userId) {
   await guestCart.destroy();
 }
 
+async function getCartItemCount(req) {
+  const models = defineModels();
+  const where = req.user
+    ? { userId: req.user.id }
+    : req.session?.guestCartKey
+      ? { sessionId: req.session.guestCartKey, userId: null }
+      : null;
+
+  if (!where) return 0;
+
+  const cart = await models.Cart.findOne({
+    where,
+    include: [{ model: models.CartItem, as: "items" }]
+  });
+  if (!cart) return 0;
+  return (cart.items || []).filter((item) => !item.savedForLater).reduce((sum, item) => sum + Number(item.qty || 0), 0);
+}
+
 module.exports = {
   ensureCartIdentity,
   getOrCreateCart,
@@ -131,5 +149,6 @@ module.exports = {
   addItem,
   updateItem,
   removeItem,
-  mergeGuestCartIntoUser
+  mergeGuestCartIntoUser,
+  getCartItemCount
 };

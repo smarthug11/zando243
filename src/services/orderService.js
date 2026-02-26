@@ -54,13 +54,17 @@ async function getUserAddressById(userId, addressId) {
   return models.Address.findOne({ where: { id: addressId, userId } });
 }
 
+function getPickupOfficeAddress() {
+  return { ...env.pickupOfficeAddress };
+}
+
 async function createOrderFromCart(req, { paymentMethod, couponCode, doorDelivery = false, addressId = null }) {
   const models = defineModels();
   if (!req.user) throw new AppError("Authentification requise", 401, "AUTH_REQUIRED");
   const cart = await loadCart(req);
   const items = (cart?.items || []).filter((i) => !i.savedForLater);
   if (!items.length) throw new AppError("Panier vide", 400, "EMPTY_CART");
-  const address = await getUserAddressById(req.user.id, addressId);
+  const address = doorDelivery ? await getUserAddressById(req.user.id, addressId) : getPickupOfficeAddress();
   if (!address) throw new AppError("Adresse requise pour commander", 400, "ADDRESS_REQUIRED");
 
   const baseTotals = computeCartTotals(cart);

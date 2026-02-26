@@ -3,6 +3,7 @@
   <% const _auth = (typeof auth !== 'undefined' && auth) ? auth : { user: null }; %>
   <% const _filters = (typeof filters !== 'undefined' && filters) ? filters : {}; %>
   <% const _csrf = (typeof csrfToken !== 'undefined' && csrfToken) ? csrfToken : ''; %>
+  <% const _cart = (typeof cartSummary !== 'undefined' && cartSummary) ? cartSummary : { count: 0 }; %>
   <div class="container-max mx-auto px-4 py-3 flex items-center gap-3 justify-between">
     <a href="/" class="flex items-center gap-2 font-extrabold text-lg md:text-xl text-slate-900 min-w-0">
       <span class="w-8 h-8 rounded-lg bg-blue-600 text-white grid place-items-center">Z</span>
@@ -13,7 +14,12 @@
     </form>
     <nav class="hidden md:flex items-center gap-2 text-sm">
       <a class="btn-secondary" href="/products">Catalogue</a>
-      <a class="btn-secondary" href="/cart">Panier</a>
+      <a class="btn-secondary inline-flex items-center gap-2" href="/cart">
+        <span>Panier</span>
+        <% if (Number(_cart.count || 0) > 0) { %>
+          <span class="min-w-6 h-6 px-1 rounded-full bg-blue-600 text-white text-[11px] font-bold inline-flex items-center justify-center"><%= _cart.count %></span>
+        <% } %>
+      </a>
       <% if (_auth.user) { %>
         <a class="btn-secondary" href="/favorites">Favoris</a>
         <a class="btn-secondary" href="/account/profile">Compte</a>
@@ -28,7 +34,12 @@
       <% } %>
     </nav>
     <div class="md:hidden flex items-center gap-2">
-      <a class="btn-secondary !px-3 !py-2 text-xs" href="/cart">Panier</a>
+      <a class="btn-secondary !px-3 !py-2 text-xs inline-flex items-center gap-2" href="/cart">
+        <span>Panier</span>
+        <% if (Number(_cart.count || 0) > 0) { %>
+          <span class="min-w-5 h-5 px-1 rounded-full bg-blue-600 text-white text-[10px] font-bold inline-flex items-center justify-center"><%= _cart.count %></span>
+        <% } %>
+      </a>
       <button
         id="mobileNavToggle"
         type="button"
