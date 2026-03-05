@@ -113,6 +113,8 @@ async function createOrderFromCart(req, { paymentMethod, couponCode, doorDeliver
         total,
         couponCode: coupon?.code || null,
         paymentMethod: paymentMethod || "CASH_ON_DELIVERY",
+        paymentStatus: "PENDING",
+        paymentProvider: paymentMethod === "PAYPAL" ? "PAYPAL" : null,
         status: "Processing",
         trackingNumber,
         trackingCarrier: "ITS Logistics"
@@ -197,6 +199,23 @@ async function createOrderFromCart(req, { paymentMethod, couponCode, doorDeliver
   return hydrated;
 }
 
+async function markOrderAsPaid(orderId, { provider = "PAYPAL", reference = null, transaction = null } = {}) {
+  const models = defineModels();
+  const order = await models.Order.findByPk(orderId, { transaction });
+  if (!order) throw new AppError("Commande introuvable", 404, "ORDER_NOT_FOUND");
+  if (order.paymentStatus === "PAID") return order;
+  await order.update(
+    {
+      paymentStatus: "PAID",
+      paymentProvider: provider || order.paymentProvider || null,
+      paymentReference: reference || order.paymentReference || null,
+      paidAt: new Date()
+    },
+    { transaction }
+  );
+  return order;
+}
+
 async function listUserOrders(userId) {
   const models = defineModels();
   return models.Order.findAll({
@@ -267,5 +286,6 @@ module.exports = {
   listUserOrders,
   getUserOrder,
   requestReturn,
-  updateOrderStatus
+  updateOrderStatus,
+  markOrderAsPaid
 };

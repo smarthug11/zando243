@@ -5,7 +5,7 @@ const { getClientContext } = require("../utils/clientContext");
 
 defineModels();
 
-const CATEGORIES = ["SYSTEM", "AUTH", "ORDER", "USER", "PRODUCT", "ADMIN", "SUPPORT"];
+const CATEGORIES = ["SYSTEM", "AUTH", "ORDER", "USER", "PRODUCT", "ADMIN", "SUPPORT", "PAYMENT"];
 const LEVELS = ["INFO", "WARN", "ERROR"];
 
 function normalize(value, fallback) {

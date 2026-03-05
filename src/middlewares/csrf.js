@@ -9,8 +9,9 @@ const csrfMw = env.csrfEnabled
   : (req, res, next) => next();
 
 function csrfProtection(req, res, next) {
-  const exempt = ["/auth/refresh"];
-  if (exempt.includes(req.path)) return next();
+  const exemptPaths = ["/auth/refresh", "/payments/paypal/webhook"];
+  const currentPath = req.originalUrl || req.path || "";
+  if (exemptPaths.some((p) => currentPath.startsWith(p))) return next();
   return csrfMw(req, res, next);
 }
 

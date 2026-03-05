@@ -6,6 +6,7 @@ const favoriteRoutes = require("./favoriteRoutes");
 const orderRoutes = require("./orderRoutes");
 const ticketRoutes = require("./ticketRoutes");
 const adminRoutes = require("./adminRoutes");
+const paymentRoutes = require("./paymentRoutes");
 
 function registerRoutes(app) {
   app.use("/", publicRoutes);
@@ -15,6 +16,7 @@ function registerRoutes(app) {
   app.use("/favorites", favoriteRoutes);
   app.use("/orders", orderRoutes);
   app.use("/tickets", ticketRoutes);
+  app.use("/payments", paymentRoutes);
   app.use("/admin", adminRoutes);
 }
 

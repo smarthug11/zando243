@@ -41,6 +41,12 @@ const env = {
     pass: process.env.SMTP_PASS || "",
     from: process.env.SMTP_FROM || "Zando243 <no-reply@zando243.local>"
   },
+  paypal: {
+    clientId: process.env.PAYPAL_CLIENT_ID || "",
+    clientSecret: process.env.PAYPAL_CLIENT_SECRET || "",
+    baseUrl: process.env.PAYPAL_BASE_URL || "https://api-m.sandbox.paypal.com",
+    webhookId: process.env.PAYPAL_WEBHOOK_ID || ""
+  },
   pickupOfficeAddress: {
     label: process.env.PICKUP_OFFICE_LABEL || "Bureau Zando243 Kinshasa",
     number: process.env.PICKUP_OFFICE_NUMBER || "17B",

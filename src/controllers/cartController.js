@@ -11,7 +11,7 @@ defineModels();
 
 const cartItemValidators = [body("productId").isUUID(), body("qty").optional().isInt({ min: 1, max: 99 }), handleValidation];
 const checkoutValidators = [
-  body("paymentMethod").isIn(["CASH_ON_DELIVERY", "CARD", "MOBILE_MONEY"]),
+  body("paymentMethod").isIn(["CASH_ON_DELIVERY", "CARD", "MOBILE_MONEY", "PAYPAL"]),
   body("addressId").optional({ checkFalsy: true }).isUUID(),
   handleValidation
 ];
@@ -74,6 +74,9 @@ const checkout = asyncHandler(async (req, res) => {
     doorDelivery: req.body.doorDelivery === "1",
     addressId: req.body.addressId
   });
+  if (req.body.paymentMethod === "PAYPAL") {
+    return res.redirect(`/payments/paypal/start?orderId=${encodeURIComponent(order.id)}`);
+  }
   setFlash(req, "success", `Commande ${order.orderNumber} creee.`);
   res.redirect(`/orders/${order.id}`);
 });
