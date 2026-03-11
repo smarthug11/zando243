@@ -25,7 +25,7 @@ async function getAccessToken() {
   return data.access_token;
 }
 
-async function createCheckoutOrder({ localOrder, returnUrl, cancelUrl }) {
+async function createCheckoutOrder({ localOrder, returnUrl = null, cancelUrl = null }) {
   const token = await getAccessToken();
   const response = await fetch(`${env.paypal.baseUrl}/v2/checkout/orders`, {
     method: "POST",
@@ -47,12 +47,16 @@ async function createCheckoutOrder({ localOrder, returnUrl, cancelUrl }) {
           description: `Commande ${localOrder.orderNumber}`
         }
       ],
-      application_context: {
-        return_url: returnUrl,
-        cancel_url: cancelUrl,
-        user_action: "PAY_NOW",
-        shipping_preference: "NO_SHIPPING"
-      }
+      ...(returnUrl && cancelUrl
+        ? {
+            application_context: {
+              return_url: returnUrl,
+              cancel_url: cancelUrl,
+              user_action: "PAY_NOW",
+              shipping_preference: "NO_SHIPPING"
+            }
+          }
+        : {})
     })
   });
   const data = await response.json().catch(() => ({}));

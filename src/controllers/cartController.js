@@ -74,7 +74,7 @@ const checkout = asyncHandler(async (req, res) => {
     doorDelivery: req.body.doorDelivery === "1",
     addressId: req.body.addressId
   });
-  if (req.body.paymentMethod === "PAYPAL") {
+  if (req.body.paymentMethod === "PAYPAL" || req.body.paymentMethod === "CARD") {
     return res.redirect(`/payments/paypal/start?orderId=${encodeURIComponent(order.id)}`);
   }
   setFlash(req, "success", `Commande ${order.orderNumber} creee.`);

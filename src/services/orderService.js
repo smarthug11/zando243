@@ -114,7 +114,7 @@ async function createOrderFromCart(req, { paymentMethod, couponCode, doorDeliver
         couponCode: coupon?.code || null,
         paymentMethod: paymentMethod || "CASH_ON_DELIVERY",
         paymentStatus: "PENDING",
-        paymentProvider: paymentMethod === "PAYPAL" ? "PAYPAL" : null,
+        paymentProvider: paymentMethod === "PAYPAL" || paymentMethod === "CARD" ? "PAYPAL" : null,
         status: "Processing",
         trackingNumber,
         trackingCarrier: "ITS Logistics"

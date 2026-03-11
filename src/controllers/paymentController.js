@@ -3,7 +3,7 @@ const { setFlash } = require("../middlewares/viewLocals");
 const { defineModels } = require("../models");
 const { env } = require("../config/env");
 const { createCheckoutOrder, captureCheckoutOrder, verifyWebhookSignature } = require("../services/paypalService");
-const { markOrderAsPaid } = require("../services/orderService");
+const { createOrderFromCart, markOrderAsPaid } = require("../services/orderService");
 const { createAuditLog } = require("../services/auditLogService");
 
 defineModels();
@@ -19,8 +19,8 @@ const startPayPal = asyncHandler(async (req, res) => {
     setFlash(req, "error", "Commande introuvable.");
     return res.redirect("/orders");
   }
-  if (order.paymentMethod !== "PAYPAL") {
-    setFlash(req, "error", "Cette commande n'utilise pas PayPal.");
+  if (order.paymentMethod !== "PAYPAL" && order.paymentMethod !== "CARD") {
+    setFlash(req, "error", "Cette commande n'utilise pas un paiement PayPal/carte.");
     return res.redirect(`/orders/${order.id}`);
   }
   if (order.paymentStatus === "PAID") {
@@ -124,8 +124,88 @@ const paypalWebhook = asyncHandler(async (req, res) => {
   return res.json({ ok: true });
 });
 
+const createPayPalOrderForSdk = asyncHandler(async (req, res) => {
+  const models = defineModels();
+  if (!env.paypal.clientId || !env.paypal.clientSecret) {
+    return res.status(400).json({ ok: false, error: "PAYPAL_NOT_CONFIGURED" });
+  }
+
+  let order = null;
+  const { localOrderId } = req.body || {};
+  if (localOrderId) {
+    order = await models.Order.findOne({ where: { id: localOrderId, userId: req.user.id } });
+  }
+
+  if (!order) {
+    order = await createOrderFromCart(req, {
+      paymentMethod: req.body?.paymentMethod === "CARD" ? "CARD" : "PAYPAL",
+      couponCode: req.body?.couponCode || null,
+      doorDelivery: req.body?.doorDelivery === true || req.body?.doorDelivery === "1",
+      addressId: req.body?.addressId || null
+    });
+  }
+
+  if (order.paymentStatus === "PAID") {
+    return res.json({ ok: true, alreadyPaid: true, localOrderId: order.id, paypalOrderId: order.paymentReference || null });
+  }
+
+  let paypalOrderId = order.paymentReference;
+  if (!paypalOrderId) {
+    const { paypalOrderId: createdPaypalOrderId } = await createCheckoutOrder({ localOrder: order });
+    paypalOrderId = createdPaypalOrderId;
+    await order.update({
+      paymentProvider: "PAYPAL",
+      paymentReference: paypalOrderId
+    });
+  }
+
+  return res.json({
+    ok: true,
+    paypalOrderId,
+    localOrderId: order.id
+  });
+});
+
+const capturePayPalOrderForSdk = asyncHandler(async (req, res) => {
+  const models = defineModels();
+  const paypalOrderId = req.body?.paypalOrderId;
+  const localOrderId = req.body?.localOrderId;
+
+  if (!paypalOrderId || !localOrderId) {
+    return res.status(400).json({ ok: false, error: "MISSING_PAYPAL_OR_LOCAL_ORDER_ID" });
+  }
+
+  const order = await models.Order.findOne({ where: { id: localOrderId, userId: req.user.id } });
+  if (!order) return res.status(404).json({ ok: false, error: "ORDER_NOT_FOUND" });
+
+  if (order.paymentStatus === "PAID") {
+    return res.json({ ok: true, orderId: order.id, status: "COMPLETED", alreadyPaid: true });
+  }
+
+  const captured = await captureCheckoutOrder(paypalOrderId);
+  if (captured?.status === "COMPLETED") {
+    await markOrderAsPaid(order.id, { provider: "PAYPAL", reference: paypalOrderId });
+    await createAuditLog({
+      category: "PAYMENT",
+      action: "PAYPAL_CAPTURE_COMPLETED_SDK",
+      message: `Paiement PayPal (SDK) confirme pour ${order.orderNumber}`,
+      actorUserId: req.user?.id,
+      actorEmail: req.user?.email,
+      requestId: req.requestId,
+      req,
+      meta: { orderId: order.id, paypalOrderId, status: captured.status }
+    });
+    return res.json({ ok: true, orderId: order.id, status: "COMPLETED" });
+  }
+
+  await order.update({ paymentStatus: "FAILED", paymentProvider: "PAYPAL", paymentReference: paypalOrderId });
+  return res.status(400).json({ ok: false, orderId: order.id, status: captured?.status || "FAILED" });
+});
+
 module.exports = {
   startPayPal,
   paypalReturn,
-  paypalWebhook
+  paypalWebhook,
+  createPayPalOrderForSdk,
+  capturePayPalOrderForSdk
 };

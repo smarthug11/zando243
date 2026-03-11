@@ -9,6 +9,10 @@ async function attachViewLocals(req, res, next) {
     res.locals.flash = req.session.flash || null;
     res.locals.auth = { user: req.user || null };
     res.locals.cartSummary = { count: await cartService.getCartItemCount(req) };
+    res.locals.paypal = {
+      enabled: Boolean(env.paypal.clientId && env.paypal.clientSecret),
+      clientId: env.paypal.clientId || ""
+    };
     if (req.session.flash) delete req.session.flash;
     next();
   } catch (error) {

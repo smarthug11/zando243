@@ -59,7 +59,7 @@
       </div>
     </div>
     <% if (auth.user) { %>
-    <form action="/cart/checkout" method="POST" class="mt-4 space-y-3">
+    <form id="checkoutForm" action="/cart/checkout" method="POST" class="mt-4 space-y-3">
       <input type="hidden" name="_csrf" value="<%= csrfToken %>">
       <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
         <div class="text-sm font-semibold text-slate-900">Adresse de retrait par defaut</div>
@@ -96,14 +96,49 @@
       </div>
 
       <input class="form-input" name="couponCode" placeholder="Coupon (ex: FIXED5)">
-      <select class="form-select" name="paymentMethod">
-        <option value="CASH_ON_DELIVERY">Cash on delivery</option>
-        <option value="CARD">Carte (stub)</option>
-        <option value="MOBILE_MONEY">Mobile Money (stub)</option>
-        <option value="PAYPAL">PayPal</option>
-      </select>
+      <div class="space-y-2">
+        <div class="text-sm font-semibold text-slate-900">Moyen de paiement</div>
+        <div id="paymentMethodCards" class="grid grid-cols-1 gap-2">
+          <!-- <label class="payment-method-card border rounded-xl p-3 cursor-pointer transition hover:border-blue-300 bg-white" data-method="CASH_ON_DELIVERY">
+           <div class="flex items-start gap-3">
+              <input type="radio" name="paymentMethod" value="CASH_ON_DELIVERY" checked>
+              <div>
+                <div class="font-semibold text-slate-900">Paiement a la livraison</div>
+                <div class="text-xs text-slate-500">Le paiement se fait a reception.</div>
+              </div>
+            </div>
+          </label>-->
+          <label class="payment-method-card border rounded-xl p-3 cursor-pointer transition hover:border-blue-300 bg-white" data-method="CARD">
+            <div class="flex items-start gap-3">
+              <input type="radio" name="paymentMethod" value="CARD">
+              <div>
+                <div class="font-semibold text-slate-900">Carte bancaire </div>
+                <div class="text-xs text-slate-500">Paiement CB/Visa/Mastercard .</div>
+              </div>
+            </div>
+          </label>
+          <label class="payment-method-card border rounded-xl p-3 cursor-pointer transition hover:border-blue-300 bg-white" data-method="MOBILE_MONEY">
+            <div class="flex items-start gap-3">
+              <input type="radio" name="paymentMethod" value="MOBILE_MONEY">
+              <div>
+                <div class="font-semibold text-slate-900">Mobile Money</div>
+                <div class="text-xs text-slate-500">Paiement mobile (integration existante conservee).</div>
+              </div>
+            </div>
+          </label>
+          <label class="payment-method-card border rounded-xl p-3 cursor-pointer transition hover:border-blue-300 bg-white" data-method="PAYPAL">
+            <div class="flex items-start gap-3">
+              <input type="radio" name="paymentMethod" value="PAYPAL">
+              <div>
+                <div class="font-semibold text-slate-900">PayPal</div>
+                <div class="text-xs text-slate-500">Connexion PayPal (wallet) avec confirmation securisee.</div>
+              </div>
+            </div>
+          </label>
+        </div>
+      </div>
       <label class="flex items-center gap-2 text-sm"><input id="doorDeliveryCheckbox" type="checkbox" name="doorDelivery" value="1"> Livraison a la porte (+$5)</label>
-      <button class="btn-primary w-full" type="submit">Valider la commande</button>
+      <button id="checkoutSubmitButton" class="btn-primary w-full" type="submit">Valider la commande</button>
     </form>
 
     <details class="mt-4 border rounded-xl p-3">
@@ -145,9 +180,33 @@
     const totalEl = document.getElementById('summaryTotal');
     const addressSection = document.getElementById('doorDeliveryAddressSection');
     const addressInputs = Array.from(document.querySelectorAll('.door-address-radio'));
+    const paymentMethodCards = Array.from(document.querySelectorAll('.payment-method-card'));
+    const paymentMethodInputs = Array.from(document.querySelectorAll('input[name="paymentMethod"]'));
 
     const toNum = (v) => Number(v || 0);
     const fmt = (n) => `$${toNum(n).toFixed(2)}`;
+
+    function getSelectedPaymentMethod() {
+      const checked = paymentMethodInputs.find((input) => input.checked);
+      return checked ? checked.value : '';
+    }
+
+    function ensureDefaultPaymentMethod() {
+      if (!paymentMethodInputs.some((input) => input.checked) && paymentMethodInputs.length) {
+        paymentMethodInputs[0].checked = true;
+      }
+    }
+
+    function refreshPaymentCardStyles() {
+      const selected = getSelectedPaymentMethod();
+      paymentMethodCards.forEach((card) => {
+        const active = card.dataset.method === selected;
+        card.classList.toggle('border-blue-500', active);
+        card.classList.toggle('bg-blue-50', active);
+        card.classList.toggle('shadow-sm', active);
+        card.classList.toggle('border-slate-200', !active);
+      });
+    }
 
     function recalc() {
       const subtotal = toNum(summary.dataset.subtotal);
@@ -165,9 +224,12 @@
       addressInputs.forEach((input) => {
         input.required = doorCheckbox.checked;
       });
+      refreshPaymentCardStyles();
     }
 
+    ensureDefaultPaymentMethod();
     doorCheckbox.addEventListener('change', recalc);
+    paymentMethodInputs.forEach((input) => input.addEventListener('change', refreshPaymentCardStyles));
     recalc();
   })();
 </script>
