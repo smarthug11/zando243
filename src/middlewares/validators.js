@@ -30,7 +30,9 @@ function sanitizeQuery(req) {
 function handleValidation(req, _res, next) {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    return next(new AppError("Validation invalide", 422, "VALIDATION_ERROR", errors.array()));
+    const details = errors.array();
+    const firstMessage = details.find((error) => typeof error.msg === "string" && error.msg)?.msg;
+    return next(new AppError(firstMessage || "Validation invalide", 422, "VALIDATION_ERROR", details));
   }
   next();
 }

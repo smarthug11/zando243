@@ -33,7 +33,9 @@ function defineModels() {
       emailVerificationTokenHash: { type: DataTypes.STRING },
       resetPasswordTokenHash: { type: DataTypes.STRING },
       resetPasswordExpiresAt: { type: DataTypes.DATE },
-      refreshTokenVersion: { type: DataTypes.INTEGER, defaultValue: 0 }
+      refreshTokenVersion: { type: DataTypes.INTEGER, defaultValue: 0 },
+      failedLoginAttempts: { type: DataTypes.INTEGER, defaultValue: 0 },
+      lockedUntil: { type: DataTypes.DATE }
     },
     { ...commonOpts, paranoid: true, tableName: "users" }
   );

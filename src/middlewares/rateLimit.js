@@ -15,4 +15,12 @@ const resetPasswordRateLimit = rateLimit({
   legacyHeaders: false
 });
 
-module.exports = { loginRateLimit, resetPasswordRateLimit };
+const registerRateLimit = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: { code: "TOO_MANY_REGISTER", message: "Trop d'inscriptions depuis cette adresse." } }
+});
+
+module.exports = { loginRateLimit, registerRateLimit, resetPasswordRateLimit };

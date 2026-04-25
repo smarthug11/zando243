@@ -67,6 +67,9 @@ function getPickupOfficeAddress() {
 async function createOrderFromCart(req, { paymentMethod, couponCode, doorDelivery = false, addressId = null }) {
   const models = defineModels();
   if (!req.user) throw new AppError("Authentification requise", 401, "AUTH_REQUIRED");
+  if (!req.user.emailVerifiedAt) {
+    throw new AppError("Veuillez vérifier votre adresse email avant de passer commande.", 403, "EMAIL_NOT_VERIFIED");
+  }
   const cart = await loadCart(req);
   const items = (cart?.items || []).filter((i) => !i.savedForLater);
   if (!items.length) throw new AppError("Panier vide", 400, "EMPTY_CART");

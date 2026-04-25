@@ -1,11 +1,11 @@
 const express = require("express");
 const { requireGuest } = require("../middlewares/auth");
-const { loginRateLimit, resetPasswordRateLimit } = require("../middlewares/rateLimit");
+const { loginRateLimit, registerRateLimit, resetPasswordRateLimit } = require("../middlewares/rateLimit");
 const ctrl = require("../controllers/authController");
 
 const router = express.Router();
 router.get("/register", requireGuest, ctrl.showRegister);
-router.post("/register", requireGuest, ...ctrl.registerValidators, ctrl.register);
+router.post("/register", requireGuest, registerRateLimit, ...ctrl.registerValidators, ctrl.register);
 router.get("/login", requireGuest, ctrl.showLogin);
 router.post("/login", requireGuest, loginRateLimit, ...ctrl.loginValidators, ctrl.login);
 router.post("/refresh", ctrl.refresh);

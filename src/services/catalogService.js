@@ -2,6 +2,7 @@ const { Op } = require("sequelize");
 const { defineModels } = require("../models");
 const { sequelize } = require("../config/database");
 const { getPagination, toPageMeta } = require("../utils/pagination");
+const { escapeLike } = require("../utils/escapeLike");
 
 defineModels();
 
@@ -9,10 +10,11 @@ function buildProductWhere(query = {}) {
   const likeOp = sequelize.getDialect() === "postgres" ? Op.iLike : Op.like;
   const where = { status: "ACTIVE" };
   if (query.q) {
+    const safeQ = escapeLike(query.q);
     where[Op.or] = [
-      { name: { [likeOp]: `%${query.q}%` } },
-      { description: { [likeOp]: `%${query.q}%` } },
-      { brand: { [likeOp]: `%${query.q}%` } }
+      { name: { [likeOp]: `%${safeQ}%` } },
+      { description: { [likeOp]: `%${safeQ}%` } },
+      { brand: { [likeOp]: `%${safeQ}%` } }
     ];
   }
   if (query.min) where.priceWithoutDelivery = { ...(where.priceWithoutDelivery || {}), [Op.gte]: Number(query.min) };

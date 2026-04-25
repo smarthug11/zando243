@@ -4,6 +4,8 @@ const { defineModels } = require("../models");
 
 defineModels();
 
+const ADMIN_IDLE_TIMEOUT_MS = 30 * 60 * 1000;
+
 async function loadCurrentUser(req, _res, next) {
   try {
     const models = defineModels();
@@ -32,4 +34,20 @@ function requireGuest(req, _res, next) {
   next();
 }
 
-module.exports = { loadCurrentUser, requireAuth, requireGuest };
+function requireFreshAdminSession(req, res, next) {
+  if (req.user?.role !== "ADMIN") return next();
+
+  const now = Date.now();
+  const lastSeenAt = Number(req.session?.adminLastSeenAt || 0);
+  if (lastSeenAt && now - lastSeenAt > ADMIN_IDLE_TIMEOUT_MS) {
+    if (req.session) delete req.session.adminLastSeenAt;
+    res.clearCookie("accessToken");
+    res.clearCookie("refreshToken");
+    return next(new AppError("Session administrateur expirée", 401, "ADMIN_SESSION_EXPIRED"));
+  }
+
+  if (req.session) req.session.adminLastSeenAt = now;
+  next();
+}
+
+module.exports = { loadCurrentUser, requireAuth, requireGuest, requireFreshAdminSession };

@@ -1,6 +1,7 @@
 const { Op } = require("sequelize");
 const { defineModels } = require("../models");
 const { toSlug } = require("../utils/slugify");
+const { escapeLike } = require("../utils/escapeLike");
 
 function parseHttpsUrl(raw) {
   if (!raw) return null;
@@ -37,10 +38,11 @@ async function listProducts(query = {}) {
   const where = {};
 
   if (q) {
+    const safeQ = escapeLike(q);
     where[Op.or] = [
-      { name: { [Op.like]: `%${q}%` } },
-      { sku: { [Op.like]: `%${q}%` } },
-      { brand: { [Op.like]: `%${q}%` } }
+      { name: { [Op.like]: `%${safeQ}%` } },
+      { sku: { [Op.like]: `%${safeQ}%` } },
+      { brand: { [Op.like]: `%${safeQ}%` } }
     ];
   }
   if (categoryId) where.categoryId = categoryId;

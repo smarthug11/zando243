@@ -1,5 +1,6 @@
 const { Op } = require("sequelize");
 const { defineModels } = require("../models");
+const { escapeLike } = require("../utils/escapeLike");
 
 async function listOrders(query = {}) {
   const models = defineModels();
@@ -30,11 +31,12 @@ async function listOrders(query = {}) {
     required: !!q
   };
   if (q) {
+    const safeQ = escapeLike(q);
     userInclude.where = {
       [Op.or]: [
-        { firstName: { [Op.like]: `%${q}%` } },
-        { lastName: { [Op.like]: `%${q}%` } },
-        { email: { [Op.like]: `%${q}%` } }
+        { firstName: { [Op.like]: `%${safeQ}%` } },
+        { lastName: { [Op.like]: `%${safeQ}%` } },
+        { email: { [Op.like]: `%${safeQ}%` } }
       ]
     };
   }

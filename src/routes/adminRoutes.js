@@ -1,10 +1,10 @@
 const express = require("express");
-const { requireAuth } = require("../middlewares/auth");
+const { requireAuth, requireFreshAdminSession } = require("../middlewares/auth");
 const { requireRole } = require("../middlewares/roles");
 const ctrl = require("../controllers/adminController");
 
 const router = express.Router();
-router.use(requireAuth, requireRole("ADMIN"));
+router.use(requireAuth, requireRole("ADMIN"), requireFreshAdminSession);
 router.get("/", ctrl.dashboard);
 router.get("/logs", ctrl.logsPage);
 router.get("/stats", ctrl.stats);

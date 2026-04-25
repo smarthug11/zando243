@@ -1,11 +1,26 @@
-const csurf = require("csurf");
+const { doubleCsrf } = require("csrf-csrf");
 const { env } = require("../config/env");
 
-const csrfMw = env.csrfEnabled
-  ? csurf({
-      cookie: false,
-      ignoreMethods: ["GET", "HEAD", "OPTIONS"]
-    })
+const csrfEnabled = env.isProd || env.csrfEnabled;
+
+const csrfMw = csrfEnabled
+  ? doubleCsrf({
+      getSecret: () => env.cookieSecret,
+      getSessionIdentifier: (req) => req.sessionID || req.ip || "anonymous",
+      cookieName: "zando243.csrf-token",
+      cookieOptions: {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: env.isProd
+      },
+      ignoredMethods: ["GET", "HEAD", "OPTIONS"],
+      getCsrfTokenFromRequest: (req) => req.body?._csrf || req.headers["x-csrf-token"],
+      errorConfig: {
+        statusCode: 403,
+        message: "Token CSRF invalide",
+        code: "EBADCSRFTOKEN"
+      }
+    }).doubleCsrfProtection
   : (req, res, next) => next();
 
 function csrfProtection(req, res, next) {

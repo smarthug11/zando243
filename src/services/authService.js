@@ -1,16 +1,26 @@
 const bcrypt = require("bcrypt");
 const { createHash, randomBytes } = require("crypto");
 const { signAccessToken, signRefreshToken, verifyRefreshToken } = require("../config/jwt");
+const { env } = require("../config/env");
 const { defineModels } = require("../models");
 const { AppError } = require("../utils/AppError");
+const { validatePasswordPolicy } = require("../utils/passwordPolicy");
 
 defineModels();
+
+const MAX_FAILED_LOGIN_ATTEMPTS = 10;
+const LOCKOUT_MS = 15 * 60 * 1000;
+
+function assertPasswordPolicy(password) {
+  const message = validatePasswordPolicy(password);
+  if (message) throw new AppError(message, 422, "WEAK_PASSWORD");
+}
 
 function cookieOptions(req) {
   return {
     httpOnly: true,
     sameSite: "lax",
-    secure: req.app.get("env") === "production"
+    secure: env.isProd
   };
 }
 
@@ -26,6 +36,7 @@ function clearAuthCookies(req, res) {
 
 async function registerUser(payload) {
   const models = defineModels();
+  assertPasswordPolicy(payload.password);
   const exists = await models.User.findOne({ where: { email: payload.email.toLowerCase() } });
   if (exists) throw new AppError("Email déjà utilisé", 409, "EMAIL_EXISTS");
   const emailVerificationToken = randomBytes(20).toString("hex");
@@ -48,8 +59,23 @@ async function loginUser({ email, password }) {
   const user = await models.User.findOne({ where: { email: email.toLowerCase() } });
   if (!user) throw new AppError("Identifiants invalides", 401, "BAD_CREDENTIALS");
   if (!user.isActive) throw new AppError("Compte bloqué", 403, "ACCOUNT_BLOCKED");
+  if (user.lockedUntil && user.lockedUntil > new Date()) {
+    throw new AppError("Compte temporairement bloqué", 423, "ACCOUNT_LOCKED");
+  }
   const ok = await bcrypt.compare(password, user.passwordHash);
-  if (!ok) throw new AppError("Identifiants invalides", 401, "BAD_CREDENTIALS");
+  if (!ok) {
+    user.failedLoginAttempts = (user.failedLoginAttempts || 0) + 1;
+    if (user.failedLoginAttempts >= MAX_FAILED_LOGIN_ATTEMPTS) {
+      user.lockedUntil = new Date(Date.now() + LOCKOUT_MS);
+    }
+    await user.save();
+    throw new AppError("Identifiants invalides", 401, "BAD_CREDENTIALS");
+  }
+  if (user.failedLoginAttempts || user.lockedUntil) {
+    user.failedLoginAttempts = 0;
+    user.lockedUntil = null;
+    await user.save();
+  }
   return user;
 }
 
@@ -60,6 +86,8 @@ async function refreshSession(token) {
   const user = await models.User.findByPk(payload.sub);
   if (!user || !user.isActive) throw new AppError("Session invalide", 401, "REFRESH_INVALID");
   if ((user.refreshTokenVersion || 0) !== payload.version) throw new AppError("Session expirée", 401, "REFRESH_REVOKED");
+  user.refreshTokenVersion = (user.refreshTokenVersion || 0) + 1;
+  await user.save();
   return user;
 }
 
@@ -93,6 +121,7 @@ async function createResetToken(email) {
 
 async function resetPassword(token, password) {
   const models = defineModels();
+  assertPasswordPolicy(password);
   const hash = createHash("sha256").update(token).digest("hex");
   const user = await models.User.findOne({ where: { resetPasswordTokenHash: hash } });
   if (!user || !user.resetPasswordExpiresAt || user.resetPasswordExpiresAt < new Date()) {

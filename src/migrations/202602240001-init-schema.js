@@ -31,6 +31,8 @@ module.exports = {
       reset_password_token_hash: S.STRING,
       reset_password_expires_at: S.DATE,
       refresh_token_version: { type: S.INTEGER, defaultValue: 0 },
+      failed_login_attempts: { type: S.INTEGER, allowNull: false, defaultValue: 0 },
+      locked_until: S.DATE,
       deleted_at: S.DATE
     });
 

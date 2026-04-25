@@ -57,14 +57,19 @@ function computeCartTotals(cart) {
 async function addItem(req, { productId, qty = 1, variantId = null }) {
   const models = defineModels();
   const cart = await getOrCreateCart(req);
+  const normalizedVariantId = variantId || null;
   const product = await models.Product.findByPk(productId);
   if (!product || product.status !== "ACTIVE") throw new AppError("Produit indisponible", 404, "PRODUCT_NOT_FOUND");
-  let item = await models.CartItem.findOne({ where: { cartId: cart.id, productId, variantId, savedForLater: false } });
+  if (normalizedVariantId) {
+    const variant = await models.ProductVariant.findOne({ where: { id: normalizedVariantId, productId } });
+    if (!variant) throw new AppError("Variante indisponible", 404, "VARIANT_NOT_FOUND");
+  }
+  let item = await models.CartItem.findOne({ where: { cartId: cart.id, productId, variantId: normalizedVariantId, savedForLater: false } });
   if (item) {
     item.qty += Number(qty);
     await item.save();
   } else {
-    item = await models.CartItem.create({ cartId: cart.id, productId, variantId, qty: Number(qty) });
+    item = await models.CartItem.create({ cartId: cart.id, productId, variantId: normalizedVariantId, qty: Number(qty) });
   }
   return item;
 }

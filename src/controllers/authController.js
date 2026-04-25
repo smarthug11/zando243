@@ -5,18 +5,27 @@ const authService = require("../services/authService");
 const { setFlash } = require("../middlewares/viewLocals");
 const { mergeGuestCartIntoUser } = require("../services/cartService");
 const { createAuditLog } = require("../services/auditLogService");
+const { validatePasswordPolicy } = require("../utils/passwordPolicy");
+
+function passwordPolicyValidator() {
+  return body("password").custom((value) => {
+    const message = validatePasswordPolicy(value);
+    if (message) throw new Error(message);
+    return true;
+  });
+}
 
 const registerValidators = [
   body("firstName").isLength({ min: 2 }),
   body("lastName").isLength({ min: 2 }),
   body("email").isEmail(),
-  body("password").isLength({ min: 8 }),
+  passwordPolicyValidator(),
   handleValidation
 ];
 
 const loginValidators = [body("email").isEmail(), body("password").isLength({ min: 6 }), handleValidation];
 const resetReqValidators = [body("email").isEmail(), handleValidation];
-const resetValidators = [body("password").isLength({ min: 8 }), handleValidation];
+const resetValidators = [passwordPolicyValidator(), handleValidation];
 
 const showRegister = (_req, res) => res.render("pages/auth/register", { title: "Inscription" });
 const showLogin = (_req, res) => res.render("pages/auth/login", { title: "Connexion" });

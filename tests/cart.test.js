@@ -268,6 +268,39 @@ test("ajout d'un produit déjà présent agrège la quantité selon le comportem
   assert.equal(Number(items[0].qty), 6);
 });
 
+test("ajout produit avec variantId vide le traite comme aucune variante", async () => {
+  const req = createReq({
+    user: customerUser,
+    method: "POST",
+    body: { productId: activeProduct.id, variantId: "", qty: 2 }
+  });
+  const { nextError } = await runHandler(cartController.addCartItem, req);
+
+  assert.equal(nextError, null);
+  const cart = await models.Cart.findOne({ where: { userId: customerUser.id } });
+  const items = await models.CartItem.findAll({ where: { cartId: cart.id } });
+  assert.equal(items.length, 1);
+  assert.equal(items[0].variantId, null);
+  assert.equal(Number(items[0].qty), 2);
+});
+
+test("ajout produit avec variantId inconnu renvoie une erreur contrôlée", async () => {
+  const req = createReq({
+    user: customerUser,
+    method: "POST",
+    body: {
+      productId: activeProduct.id,
+      variantId: "11111111-1111-4111-8111-111111111111",
+      qty: 1
+    }
+  });
+  const { res, nextError } = await runHandler(cartController.addCartItem, req);
+
+  assert.ok(nextError);
+  errorHandler(nextError, req, res);
+  assert.equal(res.statusCode, 404);
+});
+
 test("addCartItem redirige vers /cart si redirectTo=cart", async () => {
   const req = createReq({
     user: customerUser,

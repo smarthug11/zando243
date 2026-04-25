@@ -81,6 +81,7 @@ async function createUser(email = "alice-checkout@example.com") {
     lastName: "Client",
     email,
     isActive: true,
+    emailVerifiedAt: new Date(),
     refreshTokenVersion: 0,
     passwordHash: await hashPassword("Password123!")
   });
@@ -201,6 +202,20 @@ test("panier vide est refusé selon le comportement actuel", async () => {
     (err) => err.code === "EMPTY_CART" && err.statusCode === 400
   );
   assert.equal(await models.Order.count(), 0);
+});
+
+test("checkout refuse un client dont l'email n'est pas vérifié", async () => {
+  await customerUser.update({ emailVerifiedAt: null });
+  const req = createReq({ user: customerUser });
+  await addCartItem(req, productA, 1);
+
+  await assert.rejects(
+    () => orderService.createOrderFromCart(req, { paymentMethod: "MOBILE_MONEY" }),
+    (err) => err.code === "EMAIL_NOT_VERIFIED" && err.statusCode === 403
+  );
+
+  assert.equal(await models.Order.count(), 0);
+  assert.equal(await models.CartItem.count(), 1);
 });
 
 test("stock insuffisant est refusé sans décrémenter le stock", async () => {

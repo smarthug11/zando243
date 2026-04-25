@@ -9,7 +9,12 @@ const { env } = require("../config/env");
 
 defineModels();
 
-const cartItemValidators = [body("productId").isUUID(), body("qty").optional().isInt({ min: 1, max: 99 }), handleValidation];
+const cartItemValidators = [
+  body("productId").isUUID(),
+  body("variantId").optional({ checkFalsy: true }).isUUID(),
+  body("qty").optional().isInt({ min: 1, max: 99 }),
+  handleValidation
+];
 const checkoutValidators = [
   body("paymentMethod").isIn(["CASH_ON_DELIVERY", "CARD", "MOBILE_MONEY", "PAYPAL"]),
   body("addressId").optional({ checkFalsy: true }).isUUID(),
@@ -45,7 +50,7 @@ const addCartItem = asyncHandler(async (req, res) => {
   if (req.body.redirectTo === "cart") {
     return res.redirect("/cart");
   }
-  res.redirect(req.get("referer") || "/products");
+  res.redirect("/products");
 });
 
 const updateCartItem = asyncHandler(async (req, res) => {

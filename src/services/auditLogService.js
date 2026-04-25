@@ -2,6 +2,7 @@ const { Op } = require("sequelize");
 const { defineModels } = require("../models");
 const { logger } = require("../utils/logger");
 const { getClientContext } = require("../utils/clientContext");
+const { escapeLike } = require("../utils/escapeLike");
 
 defineModels();
 
@@ -50,10 +51,6 @@ function parseDate(value, endOfDay = false) {
   if (endOfDay) d.setHours(23, 59, 59, 999);
   else d.setHours(0, 0, 0, 0);
   return d;
-}
-
-function escapeLike(str) {
-  return String(str).replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
 }
 
 async function listAuditLogs(filters = {}) {
