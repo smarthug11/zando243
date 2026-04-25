@@ -18,11 +18,15 @@ function signRefreshToken(user) {
 }
 
 function verifyAccessToken(token) {
-  return jwt.verify(token, env.jwt.accessSecret);
+  const payload = jwt.verify(token, env.jwt.accessSecret, { algorithms: ["HS256"] });
+  if (payload.type !== "access") throw new Error("Type de token invalide");
+  return payload;
 }
 
 function verifyRefreshToken(token) {
-  return jwt.verify(token, env.jwt.refreshSecret);
+  const payload = jwt.verify(token, env.jwt.refreshSecret, { algorithms: ["HS256"] });
+  if (payload.type !== "refresh") throw new Error("Type de token invalide");
+  return payload;
 }
 
 module.exports = {

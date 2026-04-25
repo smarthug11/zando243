@@ -118,7 +118,8 @@ async function getDashboardStats(filters = {}) {
   const [allOrdersRaw, usersCountTotal, topProducts, topCategories, allCustomersRaw] = await Promise.all([
     models.Order.findAll({
       include: [{ model: models.OrderItem, as: "items" }],
-      order: [["createdAt", "DESC"]]
+      order: [["createdAt", "DESC"]],
+      limit: 10000
     }),
     models.User.count({ where: { role: "CUSTOMER" } }),
     models.OrderItem.findAll({
@@ -136,11 +137,29 @@ async function getDashboardStats(filters = {}) {
       group: ["categoryId"],
       limit: 5
     }),
-    models.User.findAll({ where: { role: "CUSTOMER" }, attributes: ["id", "createdAt"], order: [["createdAt", "ASC"]] })
+    models.User.findAll({ where: { role: "CUSTOMER" }, attributes: ["id", "createdAt"], order: [["createdAt", "ASC"]], limit: 10000 })
   ]);
 
   const allOrders = allOrdersRaw.map((o) => (o.get ? o.get({ plain: true }) : o));
   const allCustomers = allCustomersRaw.map((u) => (u.get ? u.get({ plain: true }) : u));
+
+  // Enrich topProducts with product names
+  const topProductIds = topProducts.map((r) => r.productId).filter(Boolean);
+  const productMap = topProductIds.length
+    ? Object.fromEntries(
+        (await models.Product.findAll({ where: { id: topProductIds }, attributes: ["id", "name", "sku"] })).map((p) => [p.id, p])
+      )
+    : {};
+  const enrichedTopProducts = topProducts.map((r) => ({ ...r.get({ plain: true }), product: productMap[r.productId] || null }));
+
+  // Enrich topCategories with category names
+  const topCategoryIds = topCategories.map((r) => r.categoryId).filter(Boolean);
+  const categoryMap = topCategoryIds.length
+    ? Object.fromEntries(
+        (await models.Category.findAll({ where: { id: topCategoryIds }, attributes: ["id", "name"] })).map((c) => [c.id, c])
+      )
+    : {};
+  const enrichedTopCategories = topCategories.map((r) => ({ ...r.get({ plain: true }), category: categoryMap[r.categoryId] || null }));
   const allFilteredOrders = allOrders.filter((o) => isWithinRange(o.createdAt, startDate, endDate));
   const filteredCustomers = allCustomers.filter((u) => isWithinRange(u.createdAt, startDate, endDate));
 
@@ -165,8 +184,8 @@ async function getDashboardStats(filters = {}) {
     avgCart,
     usersCount: filteredCustomers.length,
     usersCountTotal,
-    topProducts,
-    topCategories,
+    topProducts: enrichedTopProducts,
+    topCategories: enrichedTopCategories,
     recentOrders,
     progression,
     filters: {

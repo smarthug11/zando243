@@ -182,6 +182,10 @@ const capturePayPalOrderForSdk = asyncHandler(async (req, res) => {
     return res.json({ ok: true, orderId: order.id, status: "COMPLETED", alreadyPaid: true });
   }
 
+  if (order.paymentReference && order.paymentReference !== paypalOrderId) {
+    return res.status(400).json({ ok: false, error: "PAYPAL_ORDER_MISMATCH" });
+  }
+
   const captured = await captureCheckoutOrder(paypalOrderId);
   if (captured?.status === "COMPLETED") {
     await markOrderAsPaid(order.id, { provider: "PAYPAL", reference: paypalOrderId });

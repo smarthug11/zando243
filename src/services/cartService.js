@@ -50,7 +50,7 @@ function computeCartTotals(cart) {
       0
     )
   );
-  const shippingFee = items.length ? 0 : 0;
+  const shippingFee = 0;
   return { subtotal, shippingFee, discountTotal: 0, total: subtotal + shippingFee };
 }
 
@@ -84,6 +84,24 @@ async function removeItem(req, itemId) {
   const models = defineModels();
   const cart = await getOrCreateCart(req);
   await models.CartItem.destroy({ where: { id: itemId, cartId: cart.id } });
+}
+
+async function createCheckoutAddress(userId, payload) {
+  const models = defineModels();
+  if (payload.isDefault) {
+    await models.Address.update({ isDefault: false }, { where: { userId } });
+  }
+  return models.Address.create({
+    userId,
+    label: payload.label,
+    number: payload.number || null,
+    street: payload.street,
+    neighborhood: payload.neighborhood || null,
+    municipality: payload.municipality || null,
+    city: payload.city,
+    country: payload.country,
+    isDefault: payload.isDefault === "1"
+  });
 }
 
 async function mergeGuestCartIntoUser(req, userId) {
@@ -149,6 +167,7 @@ module.exports = {
   addItem,
   updateItem,
   removeItem,
+  createCheckoutAddress,
   mergeGuestCartIntoUser,
   getCartItemCount
 };

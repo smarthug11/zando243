@@ -2,7 +2,7 @@ const { sequelize, defineModels } = require("../models");
 const { computeCartTotals, loadCart } = require("./cartService");
 const { validateCoupon, recordCouponRedemption } = require("./promoService");
 const { generateInvoicePdf } = require("./invoiceService");
-const { grantPointsForDeliveredOrder } = require("./loyaltyService");
+const { applyDeliveredOrderEffects } = require("./loyaltyService");
 const { sendOrderInvoiceEmail } = require("./emailService");
 const { AppError } = require("../utils/AppError");
 const { computeCheckoutLineTotal, round2 } = require("../utils/pricing");
@@ -13,8 +13,14 @@ const { createAuditLog } = require("./auditLogService");
 
 defineModels();
 
-function generateOrderNumber() {
-  return `ORD-${new Date().getFullYear()}-${String(Math.floor(10000 + Math.random() * 90000))}`;
+async function generateUniqueOrderNumber(transaction) {
+  const models = defineModels();
+  for (let i = 0; i < 10; i += 1) {
+    const candidate = `ORD-${new Date().getFullYear()}-${String(Math.floor(10000 + Math.random() * 90000))}`;
+    const exists = await models.Order.findOne({ where: { orderNumber: candidate }, attributes: ["id"], transaction });
+    if (!exists) return candidate;
+  }
+  return `ORD-${new Date().getFullYear()}-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 }
 
 function generateTrackingNumberCandidate({ doorDelivery = false } = {}) {
@@ -68,35 +74,36 @@ async function createOrderFromCart(req, { paymentMethod, couponCode, doorDeliver
   if (!address) throw new AppError("Adresse requise pour commander", 400, "ADDRESS_REQUIRED");
 
   const baseTotals = computeCartTotals(cart);
-  const { coupon, discountAmount } = await validateCoupon({
-    code: couponCode,
-    userId: req.user.id,
-    subtotal: baseTotals.subtotal
-  });
-
-  const shippingFee = doorDelivery ? 5 : 0;
-  const subtotal = round2(
-    items.reduce(
-      (sum, item) =>
-        sum +
-        computeCheckoutLineTotal({
-          priceWithoutDelivery: Number(item.product.priceWithoutDelivery),
-          weightKg: Number(item.product.weightKg),
-          qty: item.qty
-        }),
-      0
-    )
-  );
-  const total = round2(Math.max(0, subtotal + shippingFee - discountAmount));
 
   const order = await sequelize.transaction(async (transaction) => {
     for (const item of items) {
       if (item.product.stock < item.qty) throw new AppError(`Stock insuffisant pour ${item.product.name}`, 400, "OUT_OF_STOCK");
     }
+    const { coupon: effectiveCoupon, discountAmount: effectiveDiscount } = await validateCoupon({
+      code: couponCode,
+      userId: req.user.id,
+      subtotal: baseTotals.subtotal,
+      transaction
+    });
+    const shippingFee = doorDelivery ? 5 : 0;
+    const subtotal = round2(
+      items.reduce(
+        (sum, item) =>
+          sum +
+          computeCheckoutLineTotal({
+            priceWithoutDelivery: Number(item.product.priceWithoutDelivery),
+            weightKg: Number(item.product.weightKg),
+            qty: item.qty
+          }),
+        0
+      )
+    );
+    const total = round2(Math.max(0, subtotal + shippingFee - effectiveDiscount));
     const trackingNumber = await generateUniqueTrackingNumber({ doorDelivery, transaction });
+    const orderNumber = await generateUniqueOrderNumber(transaction);
     const created = await models.Order.create(
       {
-        orderNumber: generateOrderNumber(),
+        orderNumber,
         userId: req.user.id,
         addressSnapshot: {
           label: address.label,
@@ -109,9 +116,9 @@ async function createOrderFromCart(req, { paymentMethod, couponCode, doorDeliver
         },
         subtotal,
         shippingFee,
-        discountTotal: discountAmount,
+        discountTotal: effectiveDiscount,
         total,
-        couponCode: coupon?.code || null,
+        couponCode: effectiveCoupon?.code || null,
         paymentMethod: paymentMethod || "CASH_ON_DELIVERY",
         paymentStatus: "PENDING",
         paymentProvider: paymentMethod === "PAYPAL" || paymentMethod === "CARD" ? "PAYPAL" : null,
@@ -156,8 +163,8 @@ async function createOrderFromCart(req, { paymentMethod, couponCode, doorDeliver
       { transaction }
     );
 
-    if (coupon) {
-      await recordCouponRedemption({ couponId: coupon.id, userId: req.user.id, orderId: created.id, transaction });
+    if (effectiveCoupon) {
+      await recordCouponRedemption({ couponId: effectiveCoupon.id, userId: req.user.id, orderId: created.id, transaction });
     }
 
     await models.CartItem.destroy({ where: { cartId: cart.id, savedForLater: false }, transaction });
@@ -257,11 +264,7 @@ async function updateOrderStatus(orderId, status, note = null) {
   await models.OrderStatusHistory.create({ orderId: order.id, status, note });
   if (status === "Delivered" && prevStatus !== "Delivered") {
     await sequelize.transaction(async (t) => {
-      await grantPointsForDeliveredOrder(order, t);
-      await models.Notification.create(
-        { userId: order.userId, type: "ORDER_STATUS", message: `Commande ${order.orderNumber} livrée.` },
-        { transaction: t }
-      );
+      await applyDeliveredOrderEffects(order, t);
     });
   }
   if (status === "Cancelled") {

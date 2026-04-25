@@ -5,10 +5,12 @@ const { AppError } = require("../utils/AppError");
 
 defineModels();
 
-async function validateCoupon({ code, userId, subtotal }) {
+async function validateCoupon({ code, userId, subtotal, transaction = null }) {
   const models = defineModels();
   if (!code) return { coupon: null, discountAmount: 0 };
-  const coupon = await models.Coupon.findOne({ where: { code: code.toUpperCase() } });
+  const findOpts = { where: { code: code.toUpperCase() } };
+  if (transaction) { findOpts.transaction = transaction; findOpts.lock = transaction.LOCK.UPDATE; }
+  const coupon = await models.Coupon.findOne(findOpts);
   if (!coupon || !coupon.isActive) throw new AppError("Coupon invalide", 400, "INVALID_COUPON");
   const now = new Date();
   if (coupon.startAt > now || coupon.endAt < now) throw new AppError("Coupon expiré/inactif", 400, "COUPON_NOT_VALID");

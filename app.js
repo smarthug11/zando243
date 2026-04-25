@@ -18,7 +18,7 @@ const { notFoundHandler } = require("./src/middlewares/notFound");
 const { errorHandler } = require("./src/middlewares/errorHandler");
 
 const app = express();
-app.set("trust proxy", true);
+app.set("trust proxy", 1);
 
 initDatabase();
 
@@ -34,7 +34,21 @@ app.use(
 );
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
-app.use(cors({ origin: true, credentials: true }));
+
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || env.appUrl)
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+app.use(
+  cors({
+    origin: (origin, cb) => {
+      if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+      cb(null, false);
+    },
+    credentials: true
+  })
+);
+
 app.use(cookieParser(env.cookieSecret));
 app.use(
   session({
@@ -46,7 +60,7 @@ app.use(
       httpOnly: true,
       sameSite: "lax",
       secure: env.isProd,
-      maxAge: 1000 * 60 * 60 * 24 * 7
+      maxAge: 1000 * 60 * 60 * 4
     }
   })
 );
@@ -54,7 +68,7 @@ app.use(
 applySecurityMiddlewares(app);
 
 app.use("/public", express.static(path.join(__dirname, "src/public")));
-app.use("/invoices", express.static(path.join(__dirname, "storage/invoices")));
+// /invoices supprimé — les factures sont servies via GET /orders/:id/invoice (authentifié)
 
 app.use(loadCurrentUser);
 app.use(csrfProtection);

@@ -16,4 +16,14 @@ async function grantPointsForDeliveredOrder(order, transaction) {
   return points;
 }
 
-module.exports = { computeEarnedPoints, grantPointsForDeliveredOrder };
+async function applyDeliveredOrderEffects(order, transaction) {
+  const models = defineModels();
+  const points = await grantPointsForDeliveredOrder(order, transaction);
+  await models.Notification.create(
+    { userId: order.userId, type: "ORDER_STATUS", message: `Commande ${order.orderNumber} livrée.` },
+    { transaction }
+  );
+  return { points };
+}
+
+module.exports = { computeEarnedPoints, grantPointsForDeliveredOrder, applyDeliveredOrderEffects };

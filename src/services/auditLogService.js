@@ -52,16 +52,21 @@ function parseDate(value, endOfDay = false) {
   return d;
 }
 
+function escapeLike(str) {
+  return String(str).replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
+}
+
 async function listAuditLogs(filters = {}) {
   const models = defineModels();
   const where = {};
   if (filters.category) where.category = normalize(filters.category);
   if (filters.level) where.level = normalize(filters.level);
-  if (filters.actorEmail) where.actorEmail = { [Op.like]: `%${filters.actorEmail}%` };
+  if (filters.actorEmail) where.actorEmail = { [Op.like]: `%${escapeLike(filters.actorEmail)}%` };
   if (filters.q) {
+    const q = escapeLike(filters.q);
     where[Op.or] = [
-      { message: { [Op.like]: `%${filters.q}%` } },
-      { action: { [Op.like]: `%${filters.q}%` } }
+      { message: { [Op.like]: `%${q}%` } },
+      { action: { [Op.like]: `%${q}%` } }
     ];
   }
   const startDate = parseDate(filters.startDate, false);

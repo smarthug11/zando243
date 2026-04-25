@@ -87,8 +87,21 @@ async function captureCheckoutOrder(paypalOrderId) {
   return data;
 }
 
+const PAYPAL_CERT_HOSTS = /^(api\.paypal\.com|api-m\.paypal\.com|www\.paypalobjects\.com)$/;
+
+function isValidPaypalCertUrl(certUrl) {
+  try {
+    const u = new URL(certUrl);
+    return u.protocol === "https:" && PAYPAL_CERT_HOSTS.test(u.hostname);
+  } catch (_) {
+    return false;
+  }
+}
+
 async function verifyWebhookSignature(req) {
   if (!env.paypal.webhookId) return false;
+  const certUrl = req.headers["paypal-cert-url"];
+  if (!isValidPaypalCertUrl(certUrl)) return false;
   const token = await getAccessToken();
   const body = req.body || {};
   const response = await fetch(`${env.paypal.baseUrl}/v1/notifications/verify-webhook-signature`, {
@@ -100,7 +113,7 @@ async function verifyWebhookSignature(req) {
     body: JSON.stringify({
       transmission_id: req.headers["paypal-transmission-id"],
       transmission_time: req.headers["paypal-transmission-time"],
-      cert_url: req.headers["paypal-cert-url"],
+      cert_url: certUrl,
       auth_algo: req.headers["paypal-auth-algo"],
       transmission_sig: req.headers["paypal-transmission-sig"],
       webhook_id: env.paypal.webhookId,

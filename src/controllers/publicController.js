@@ -2,6 +2,7 @@ const { asyncHandler } = require("../utils/asyncHandler");
 const catalogService = require("../services/catalogService");
 const { ensureCartIdentity } = require("../services/cartService");
 const reviewService = require("../services/reviewService");
+const seoService = require("../services/seoService");
 const { body } = require("express-validator");
 const { handleValidation } = require("../middlewares/validators");
 const { setFlash } = require("../middlewares/viewLocals");
@@ -72,13 +73,12 @@ const submitReview = asyncHandler(async (req, res) => {
 });
 
 const sitemap = asyncHandler(async (_req, res) => {
-  const { products } = await catalogService.listProducts({ limit: 200, page: 1 });
-  const categories = await catalogService.listCategories();
-  res.type("application/xml").send(`<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n${["/", "/products", ...categories.map((c) => `/categories/${c.slug}`), ...products.map((p) => `/products/${p.slug}`)].map((u) => `<url><loc>${res.locals.app.url}${u}</loc></url>`).join("\n")}\n</urlset>`);
+  const xml = await seoService.generateSitemapXml(res.locals.app.url);
+  res.type("application/xml").send(xml);
 });
 
 function robots(_req, res) {
-  res.type("text/plain").send("User-agent: *\nAllow: /\nSitemap: /sitemap.xml");
+  res.type("text/plain").send(seoService.generateRobotsTxt());
 }
 
 module.exports = {

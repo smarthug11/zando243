@@ -37,7 +37,7 @@ const register = asyncHandler(async (req, res) => {
   });
   authService.setAuthCookies(req, res, user);
   await mergeGuestCartIntoUser(req, user.id);
-  setFlash(req, "success", `Compte créé. Token vérification (démo): ${emailVerificationToken}`);
+  setFlash(req, "success", "Compte créé. Un email de vérification vous a été envoyé.");
   res.redirect("/");
 });
 
@@ -91,7 +91,7 @@ const verifyEmail = asyncHandler(async (req, res) => {
 
 const requestPasswordReset = asyncHandler(async (req, res) => {
   const result = await authService.createResetToken(req.body.email);
-  setFlash(req, "success", result ? `Token reset (démo): ${result.token}` : "Si le compte existe, un email a été envoyé.");
+  setFlash(req, "success", "Si ce compte existe, un email de réinitialisation a été envoyé.");
   res.redirect("/auth/login");
 });
 

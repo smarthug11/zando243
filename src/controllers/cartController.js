@@ -82,25 +82,11 @@ const checkout = asyncHandler(async (req, res) => {
 });
 
 const createCheckoutAddress = asyncHandler(async (req, res) => {
-  const models = defineModels();
   if (!req.user) {
     setFlash(req, "error", "Connectez-vous pour ajouter une adresse.");
     return res.redirect("/auth/login");
   }
-  if (req.body.isDefault) {
-    await models.Address.update({ isDefault: false }, { where: { userId: req.user.id } });
-  }
-  await models.Address.create({
-    userId: req.user.id,
-    label: req.body.label,
-    number: req.body.number || null,
-    street: req.body.street,
-    neighborhood: req.body.neighborhood || null,
-    municipality: req.body.municipality || null,
-    city: req.body.city,
-    country: req.body.country,
-    isDefault: req.body.isDefault === "1"
-  });
+  await cartService.createCheckoutAddress(req.user.id, req.body);
   setFlash(req, "success", "Adresse ajoutee pour la commande.");
   res.redirect("/cart");
 });

@@ -170,7 +170,7 @@ async function sendOrderInvoiceEmail(order, options = {}) {
   const transport = getTransporter();
   if (!transport) {
     logger.info(
-      { orderNumber: order.orderNumber, to: order.User?.email, reason: "smtp_not_configured" },
+      { orderNumber: order.orderNumber, reason: "smtp_not_configured" },
       "Email facture non envoye (SMTP non configuré)"
     );
     return { sent: false, reason: "smtp_not_configured", html };
@@ -187,7 +187,7 @@ async function sendOrderInvoiceEmail(order, options = {}) {
   }
 
   const info = await transport.sendMail(mailOptions);
-  logger.info({ orderNumber: order.orderNumber, messageId: info.messageId, to: order.User?.email }, "Email facture envoye");
+  logger.info({ orderNumber: order.orderNumber, messageId: info.messageId }, "Email facture envoye");
   return { sent: true, info };
 }
 

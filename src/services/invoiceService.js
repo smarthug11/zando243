@@ -39,4 +39,15 @@ async function generateInvoicePdf(order) {
   return `/invoices/${filename}`;
 }
 
-module.exports = { generateInvoicePdf };
+function getInvoiceDownload(order) {
+  const filename = `${order.orderNumber}.pdf`;
+  const filepath = path.join(env.invoiceDir, filename);
+  if (!fs.existsSync(filepath)) return null;
+  return {
+    filepath,
+    contentType: "application/pdf",
+    contentDisposition: `attachment; filename="${filename}"`
+  };
+}
+
+module.exports = { generateInvoicePdf, getInvoiceDownload };
