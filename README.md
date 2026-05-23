@@ -8,8 +8,8 @@ Projet e-commerce modulaire (MVC + services) inspiré d'Amazon / AliExpress, ave
 - EJS (SSR)
 - PostgreSQL
 - Sequelize + migrations + seeders
-- Auth JWT (access + refresh) via cookies httpOnly
-- `bcrypt`, `helmet`, `csurf`, `express-rate-limit`, `express-validator`
+- **Better Auth** (sessions cookies httpOnly, scrypt) — système d'auth principal et unique depuis 23/05/2026
+- `helmet`, `csrf-csrf`, `express-rate-limit`, `express-validator`, `sanitize-html`
 - Logs structurés `pino` + `requestId`
 
 ## Installation
@@ -37,8 +37,11 @@ npm run dev
 
 Accès:
 - App: `http://localhost:3000`
+- Page de connexion: `/auth2/login` (les URL legacy `/auth/login` redirigent en 308 vers `/auth2/login`)
 - Admin seed: `admin1@zando243.local` / `Password123!`
 - User seed: `user1@zando243.local` / `Password123!`
+
+Les comptes seed sont créés via l'API Better Auth (sign-up programmatique). Aucun hash bcrypt manuel.
 
 ## Scripts
 
@@ -53,10 +56,13 @@ Accès:
 Voir `.env.example`:
 - `PORT`, `APP_URL`
 - `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`
-- `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `JWT_ACCESS_TTL`, `JWT_REFRESH_TTL`
+- `BETTER_AUTH_ENABLED` (true par défaut), `BETTER_AUTH_SECRET` (≥32 chars), `BETTER_AUTH_URL`
 - `COOKIE_SECRET`, `SESSION_SECRET`
 - `CSRF_ENABLED`
+- `SMTP_*` pour l'envoi des emails de vérification / reset password (gérés par Better Auth)
 - `LOYALTY_POINTS_PER_DOLLAR`, `LOYALTY_MIN_ORDER_FOR_POINTS`
+
+Les variables `JWT_*` restent dans `.env.example` par compatibilité mais ne sont plus lues (cleanup à venir).
 
 ## Structure
 
@@ -79,7 +85,7 @@ server.js
 
 ## Fonctionnalités couvertes
 
-- Auth: register/login/logout/refresh, reset password, verify email (flux démo avec token affiché en flash)
+- Auth: register/login/logout via Better Auth, reset password, verify email (envoi SMTP automatique)
 - Compte: profil, adresses multiples + défaut, notifications
 - Catalogue: catégories hiérarchiques, recherche/filtres/pagination, SEO SSR de base (title/meta, sitemap, robots)
 - Panier: invité (session) + connecté (DB), fusion à la connexion, save-for-later
@@ -92,12 +98,14 @@ server.js
 
 ## Notes de sécurité
 
-- `helmet`, rate limiting global + login/reset
-- CSRF sur formulaires SSR (`csurf`)
-- Validation `express-validator`
-- Sanitization simple (body/query)
-- Cookies `httpOnly`
+- `helmet` avec CSP explicite, rate limiting global + login/reset/register
+- CSRF sur formulaires SSR (`csrf-csrf`, double-submit cookie)
+- Validation `express-validator` + sanitisation HTML stricte (`sanitize-html`)
+- Cookies `httpOnly`, prefix `__Host-` en prod sur les cookies BA
+- Politique de mot de passe (12 chars min, blocklist, ≤72 octets UTF-8) appliquée côté Better Auth via hook
+- Verrouillage `FOR UPDATE` sur stock dans la transaction checkout (TOCTOU éliminé)
 - Soft delete (paranoid) sur `User` et `Product`
+- Trois audits sécurité documentés dans `security-audits/` (SAST, SAST V2, OWASP ASVS L1)
 
 ## Maquettes UI
 

@@ -58,18 +58,23 @@ async function addItem(req, { productId, qty = 1, variantId = null }) {
   const models = defineModels();
   const cart = await getOrCreateCart(req);
   const normalizedVariantId = variantId || null;
+  const requestedQty = Number(qty);
   const product = await models.Product.findByPk(productId);
   if (!product || product.status !== "ACTIVE") throw new AppError("Produit indisponible", 404, "PRODUCT_NOT_FOUND");
+  let item = await models.CartItem.findOne({ where: { cartId: cart.id, productId, variantId: normalizedVariantId, savedForLater: false } });
   if (normalizedVariantId) {
     const variant = await models.ProductVariant.findOne({ where: { id: normalizedVariantId, productId } });
     if (!variant) throw new AppError("Variante indisponible", 404, "VARIANT_NOT_FOUND");
+    const totalRequestedQty = Number(item?.qty || 0) + requestedQty;
+    if (Number(variant.stock) < totalRequestedQty) {
+      throw new AppError(`Stock insuffisant pour ${variant.name}`, 400, "OUT_OF_STOCK");
+    }
   }
-  let item = await models.CartItem.findOne({ where: { cartId: cart.id, productId, variantId: normalizedVariantId, savedForLater: false } });
   if (item) {
-    item.qty += Number(qty);
+    item.qty += requestedQty;
     await item.save();
   } else {
-    item = await models.CartItem.create({ cartId: cart.id, productId, variantId: normalizedVariantId, qty: Number(qty) });
+    item = await models.CartItem.create({ cartId: cart.id, productId, variantId: normalizedVariantId, qty: requestedQty });
   }
   return item;
 }
@@ -83,6 +88,10 @@ async function updateItem(req, itemId, changes) {
   if (changes.savedForLater != null) item.savedForLater = Boolean(changes.savedForLater);
   await item.save();
   return item;
+}
+
+async function moveSavedItemToCart(req, itemId) {
+  return updateItem(req, itemId, { savedForLater: false });
 }
 
 async function removeItem(req, itemId) {
@@ -171,6 +180,7 @@ module.exports = {
   computeCartTotals,
   addItem,
   updateItem,
+  moveSavedItemToCart,
   removeItem,
   createCheckoutAddress,
   mergeGuestCartIntoUser,

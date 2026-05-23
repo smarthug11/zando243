@@ -16,6 +16,8 @@ const { loadCurrentUser } = require("./src/middlewares/auth");
 const { registerRoutes } = require("./src/routes");
 const { notFoundHandler } = require("./src/middlewares/notFound");
 const { errorHandler } = require("./src/middlewares/errorHandler");
+const { AppError } = require("./src/utils/AppError");
+const { getBetterAuthModule } = require("./src/utils/betterAuthBridge");
 
 const app = express();
 app.set("trust proxy", 1);
@@ -47,6 +49,35 @@ app.use(
     }
   })
 );
+
+const BODY_METHODS = new Set(["POST", "PATCH", "PUT", "DELETE"]);
+const ACCEPTED_BODY_TYPES = ["application/x-www-form-urlencoded", "application/json", "multipart/form-data"];
+
+function validateContentType(req, _res, next) {
+  if (!BODY_METHODS.has(req.method)) return next();
+  const currentPath = req.originalUrl || req.path || "";
+  if (currentPath.startsWith("/payments/paypal/webhook")) return next();
+
+  if (!req.headers["content-type"]) return next();
+  if (req.is(ACCEPTED_BODY_TYPES)) return next();
+
+  return next(new AppError("Content-Type non supporté.", 415, "UNSUPPORTED_CONTENT_TYPE"));
+}
+
+app.use(validateContentType);
+
+if (env.betterAuthEnabled) {
+  app.all("/api/auth/*", async (req, res, next) => {
+    try {
+      const mod = await getBetterAuthModule();
+      const auth = mod.getAuth();
+      return mod.toNodeHandler(auth)(req, res);
+    } catch (err) {
+      return next(err);
+    }
+  });
+}
+
 app.use(express.urlencoded({ extended: true, limit: "16kb" }));
 app.use(express.json({ limit: "64kb" }));
 

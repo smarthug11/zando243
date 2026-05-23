@@ -4,17 +4,8 @@ const path = require("path");
 const os = require("os");
 const fs = require("fs");
 
-const dbPath = path.join(os.tmpdir(), `zando243-admin-coupons-${process.pid}-${Date.now()}.sqlite`);
 
-process.env.NODE_ENV = "test";
-process.env.SQLITE_STORAGE = dbPath;
-process.env.CSRF_ENABLED = "false";
-process.env.DB_LOG = "false";
-process.env.JWT_ACCESS_SECRET = "test_access_secret";
-process.env.JWT_REFRESH_SECRET = "test_refresh_secret";
-process.env.COOKIE_SECRET = "test_cookie_secret";
-process.env.SESSION_SECRET = "test_session_secret";
-
+require("./_setup-test-db");
 const { sequelize, defineModels, hashPassword } = require("../src/models");
 const adminController = require("../src/controllers/adminController");
 const { requireAuth } = require("../src/middlewares/auth");
@@ -87,6 +78,21 @@ async function runHandler(handler, req, res = createRes()) {
   return { res, nextError };
 }
 
+async function runMiddlewares(middlewares, req, res = createRes()) {
+  let nextError = null;
+
+  for (const middleware of middlewares) {
+    let nextCalled = false;
+    await middleware(req, res, (err) => {
+      if (err) nextError = err;
+      nextCalled = true;
+    });
+    if (nextError || res.redirectTo || !nextCalled) break;
+  }
+
+  return { res, nextError };
+}
+
 async function seedBaseData() {
   await sequelize.sync({ force: true });
 
@@ -121,7 +127,6 @@ test.beforeEach(async () => {
 
 test.after(async () => {
   await sequelize.close();
-  if (fs.existsSync(dbPath)) fs.unlinkSync(dbPath);
 });
 
 test("un admin connecté peut afficher la page coupons et voir les coupons existants", async () => {
@@ -217,6 +222,26 @@ test("les valeurs numériques, dates et statut sont persistés selon le comporte
   assert.equal(coupon.isActive, false);
   assert.equal(new Date(coupon.startAt).toISOString(), new Date("2026-07-01T08:00").toISOString());
   assert.equal(new Date(coupon.endAt).toISOString(), new Date("2026-07-31T20:15").toISOString());
+});
+
+test("un coupon incomplet est refusé proprement avec flash", async () => {
+  const req = createReq({
+    user: adminUser,
+    method: "POST",
+    body: {
+      code: "incomplete",
+      type: "PERCENT",
+      value: "10"
+    }
+  });
+
+  const { res, nextError } = await runMiddlewares(adminController.couponValidators, req);
+
+  assert.equal(nextError, null);
+  assert.equal(res.redirectTo, "/admin/coupons");
+  assert.deepEqual(req.session.flash, { type: "error", message: "La date de début est requise." });
+  const coupon = await models.Coupon.findOne({ where: { code: "INCOMPLETE" } });
+  assert.equal(coupon, null);
 });
 
 test("un non-admin est bloqué selon le comportement actuel", async () => {

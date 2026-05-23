@@ -165,6 +165,51 @@ function renderInvoiceEmailHtml(order) {
   </html>`;
 }
 
+function applyDevSink({ to, subject }) {
+  if (!env.devEmailSink) return { to, subject };
+  const original = Array.isArray(to) ? to.join(",") : to;
+  return { to: env.devEmailSink, subject: `[DEV→${original}] ${subject}` };
+}
+
+async function sendMail({ to, subject, html, text, attachments }) {
+  const transport = getTransporter();
+  if (!transport) {
+    logger.info({ to, subject, reason: "smtp_not_configured" }, "Email non envoye (SMTP non configuré)");
+    return { sent: false, reason: "smtp_not_configured" };
+  }
+  const routed = applyDevSink({ to, subject });
+  const info = await transport.sendMail({
+    from: env.smtp.from,
+    to: routed.to,
+    subject: routed.subject,
+    html,
+    text,
+    attachments
+  });
+  logger.info({ to: routed.to, subject: routed.subject, messageId: info.messageId }, "Email envoye");
+  return { sent: true, info };
+}
+
+async function sendVerificationEmail(toEmail, url) {
+  const safeUrl = escapeHtml(url);
+  return sendMail({
+    to: toEmail,
+    subject: `Vérifie ton email - ${env.appName}`,
+    html: `<p>Bonjour,</p><p>Clique sur ce lien pour vérifier ton adresse :</p><p><a href="${safeUrl}">${safeUrl}</a></p><p>Si tu n'es pas à l'origine de cette inscription, ignore ce mail.</p>`,
+    text: `Vérifie ton email : ${url}`
+  });
+}
+
+async function sendResetPasswordEmail(toEmail, url) {
+  const safeUrl = escapeHtml(url);
+  return sendMail({
+    to: toEmail,
+    subject: `Réinitialise ton mot de passe - ${env.appName}`,
+    html: `<p>Bonjour,</p><p>Clique sur ce lien pour choisir un nouveau mot de passe :</p><p><a href="${safeUrl}">${safeUrl}</a></p><p>Ce lien expire bientôt. Si tu n'es pas à l'origine de cette demande, ignore ce mail.</p>`,
+    text: `Réinitialise ton mot de passe : ${url}`
+  });
+}
+
 async function sendOrderInvoiceEmail(order, options = {}) {
   const html = renderInvoiceEmailHtml(order);
   const transport = getTransporter();
@@ -176,10 +221,14 @@ async function sendOrderInvoiceEmail(order, options = {}) {
     return { sent: false, reason: "smtp_not_configured", html };
   }
 
+  const routed = applyDevSink({
+    to: order.User?.email,
+    subject: `Facture ${order.orderNumber} - ${env.appName}`
+  });
   const mailOptions = {
     from: env.smtp.from,
-    to: order.User?.email,
-    subject: `Facture ${order.orderNumber} - ${env.appName}`,
+    to: routed.to,
+    subject: routed.subject,
     html
   };
   if (options.attachmentPath) {
@@ -191,4 +240,10 @@ async function sendOrderInvoiceEmail(order, options = {}) {
   return { sent: true, info };
 }
 
-module.exports = { sendOrderInvoiceEmail, renderInvoiceEmailHtml };
+module.exports = {
+  sendMail,
+  sendVerificationEmail,
+  sendResetPasswordEmail,
+  sendOrderInvoiceEmail,
+  renderInvoiceEmailHtml
+};

@@ -23,7 +23,7 @@ async function listOrders(query = {}) {
       d.setHours(23, 59, 59, 999);
       if (!Number.isNaN(d.getTime())) range[Op.lte] = d;
     }
-    if (Object.keys(range).length) orderWhere.createdAt = range;
+    if (Object.getOwnPropertySymbols(range).length) orderWhere.createdAt = range;
   }
 
   const userInclude = {

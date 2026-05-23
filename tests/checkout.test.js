@@ -4,22 +4,11 @@ const path = require("path");
 const os = require("os");
 const fs = require("fs");
 
-const dbPath = path.join(os.tmpdir(), `zando243-checkout-${process.pid}-${Date.now()}.sqlite`);
 
-process.env.NODE_ENV = "test";
-process.env.SQLITE_STORAGE = dbPath;
-process.env.CSRF_ENABLED = "false";
-process.env.DB_LOG = "false";
-process.env.JWT_ACCESS_SECRET = "test_access_secret";
-process.env.JWT_REFRESH_SECRET = "test_refresh_secret";
-process.env.COOKIE_SECRET = "test_cookie_secret";
-process.env.SESSION_SECRET = "test_session_secret";
-process.env.SMTP_HOST = "";
-process.env.SMTP_USER = "";
-process.env.SMTP_PASS = "";
-
+require("./_setup-test-db");
 const { sequelize, defineModels, hashPassword } = require("../src/models");
 const cartController = require("../src/controllers/cartController");
+const paymentController = require("../src/controllers/paymentController");
 const cartService = require("../src/services/cartService");
 const orderService = require("../src/services/orderService");
 const { errorHandler } = require("../src/middlewares/errorHandler");
@@ -32,6 +21,8 @@ let customerUser;
 let category;
 let productA;
 let productB;
+let originalPaypalConfig;
+let originalFetch;
 
 function createRes() {
   return {
@@ -100,6 +91,17 @@ async function createProduct({ name, sku, priceWithoutDelivery, weightKg, stock 
   });
 }
 
+async function createVariant(product, overrides = {}) {
+  return models.ProductVariant.create({
+    productId: product.id,
+    name: overrides.name || "Variante test",
+    color: overrides.color || null,
+    size: overrides.size || null,
+    sku: overrides.sku || null,
+    stock: overrides.stock ?? 1
+  });
+}
+
 async function addCartItem(req, product, qty) {
   const cart = await cartService.getOrCreateCart(req);
   return models.CartItem.create({ cartId: cart.id, productId: product.id, qty });
@@ -144,10 +146,19 @@ async function seedBaseData() {
 
 test.before(async () => {
   models = defineModels();
+  originalPaypalConfig = { ...env.paypal };
+  originalFetch = global.fetch;
 });
 
 test.beforeEach(async () => {
   await seedBaseData();
+  Object.assign(env.paypal, originalPaypalConfig);
+  global.fetch = originalFetch;
+});
+
+test.after(() => {
+  Object.assign(env.paypal, originalPaypalConfig);
+  global.fetch = originalFetch;
 });
 
 test("client connecté peut créer une commande depuis un panier valide", async () => {
@@ -194,6 +205,67 @@ test("checkout controller redirige un visiteur non connecté vers login sans cr�
   assert.equal(await models.Order.count(), 0);
 });
 
+test("checkout PayPal non configuré garde le panier et ne crée pas de commande", async () => {
+  env.paypal.clientId = "";
+  env.paypal.clientSecret = "";
+  const req = createReq({
+    user: customerUser,
+    body: { paymentMethod: "PAYPAL" }
+  });
+  await addCartItem(req, productA, 1);
+
+  const { res, nextError } = await runHandler(cartController.checkout, req);
+
+  assert.equal(nextError, null);
+  assert.equal(res.redirectTo, "/cart");
+  assert.deepEqual(req.session.flash, { type: "error", message: "PayPal n'est pas configure sur le serveur." });
+  assert.equal(await models.Order.count(), 0);
+  assert.equal(await models.CartItem.count(), 1);
+});
+
+test("échec d'initialisation PayPal conserve les CartItem", async () => {
+  env.paypal.clientId = "client-id";
+  env.paypal.clientSecret = "client-secret";
+  env.paypal.baseUrl = "https://api-m.sandbox.paypal.com";
+  global.fetch = async (url) => {
+    if (String(url).endsWith("/v1/oauth2/token")) {
+      return { ok: true, json: async () => ({ access_token: "test-token" }) };
+    }
+    return { ok: false, statusText: "Bad Gateway", json: async () => ({ message: "create failed" }) };
+  };
+  const req = createReq({
+    user: customerUser,
+    body: { paymentMethod: "PAYPAL" }
+  });
+  await addCartItem(req, productA, 1);
+
+  const checkoutResult = await runHandler(cartController.checkout, req);
+  assert.equal(checkoutResult.nextError, null);
+  const order = await models.Order.findOne({ where: { userId: customerUser.id } });
+  assert.ok(order);
+  assert.equal(await models.CartItem.count(), 1);
+
+  const paypalReq = createReq({
+    user: customerUser,
+    method: "GET",
+    originalUrl: "/payments/paypal/start",
+    path: "/payments/paypal/start",
+    query: { orderId: order.id },
+    session: req.session
+  });
+  const { res, nextError } = await runHandler(paymentController.startPayPal, paypalReq);
+
+  assert.equal(nextError, null);
+  assert.equal(res.redirectTo, "/cart");
+  assert.deepEqual(paypalReq.session.flash, {
+    type: "error",
+    message: "Impossible d'initialiser le paiement PayPal. Votre panier est conserve."
+  });
+  await order.reload();
+  assert.equal(order.paymentReference, null);
+  assert.equal(await models.CartItem.count(), 1);
+});
+
 test("panier vide est refusé selon le comportement actuel", async () => {
   const req = createReq({ user: customerUser });
 
@@ -231,6 +303,125 @@ test("stock insuffisant est refusé sans décrémenter le stock", async () => {
   assert.equal(productB.stock, 3);
   assert.equal(await models.Order.count(), 0);
   assert.equal(await models.CartItem.count(), 1);
+});
+
+test("checkout utilise le stock relu dans la transaction et ignore le stock préchargé périmé", async () => {
+  const req = createReq({ user: customerUser });
+  const cart = await cartService.getOrCreateCart(req);
+  await models.CartItem.create({ cartId: cart.id, productId: productB.id, qty: 1 });
+  await productB.update({ stock: 1 });
+
+  const originalFindByPk = models.Cart.findByPk;
+  models.Cart.findByPk = async () => ({
+    id: cart.id,
+    items: [
+      {
+        savedForLater: false,
+        productId: productB.id,
+        qty: 1,
+        product: { stock: 0, name: productB.name }
+      }
+    ]
+  });
+
+  let order;
+  try {
+    order = await orderService.createOrderFromCart(req, { paymentMethod: "MOBILE_MONEY" });
+  } finally {
+    models.Cart.findByPk = originalFindByPk;
+  }
+
+  assert.equal(order.items.length, 1);
+  assert.equal(order.items[0].productId, productB.id);
+  await productB.reload();
+  assert.equal(productB.stock, 0);
+  assert.equal(await models.CartItem.count(), 0);
+});
+
+test("stock insuffisant après relecture transactionnelle refuse la commande et garde le panier", async () => {
+  const req = createReq({ user: customerUser });
+  await addCartItem(req, productB, 1);
+  await productB.update({ stock: 0 });
+
+  await assert.rejects(
+    () => orderService.createOrderFromCart(req, { paymentMethod: "MOBILE_MONEY" }),
+    (err) => err.code === "OUT_OF_STOCK" && err.statusCode === 400
+  );
+
+  await productB.reload();
+  assert.equal(productB.stock, 0);
+  assert.equal(await models.Order.count(), 0);
+  assert.equal(await models.OrderItem.count(), 0);
+  assert.equal(await models.CartItem.count(), 1);
+});
+
+test("checkout ne rend jamais le stock négatif et ne crée pas d'OrderItem si la quantité dépasse le stock", async () => {
+  const req = createReq({ user: customerUser });
+  await productB.update({ stock: 1 });
+  await addCartItem(req, productB, 2);
+
+  await assert.rejects(
+    () => orderService.createOrderFromCart(req, { paymentMethod: "MOBILE_MONEY" }),
+    (err) => err.code === "OUT_OF_STOCK" && err.statusCode === 400
+  );
+
+  await productB.reload();
+  assert.equal(productB.stock, 1);
+  assert.equal(await models.Order.count(), 0);
+  assert.equal(await models.OrderItem.count(), 0);
+});
+
+test("checkout avec variante stock 1 et quantité 1 décrémente ProductVariant.stock", async () => {
+  const req = createReq({ user: customerUser });
+  const variant = await createVariant(productA, { name: "Rouge", stock: 1 });
+  const cart = await cartService.getOrCreateCart(req);
+  await models.CartItem.create({ cartId: cart.id, productId: productA.id, variantId: variant.id, qty: 1 });
+
+  const order = await orderService.createOrderFromCart(req, { paymentMethod: "MOBILE_MONEY" });
+
+  assert.equal(order.items.length, 1);
+  await variant.reload();
+  await productA.reload();
+  assert.equal(variant.stock, 0);
+  assert.equal(productA.stock, 10);
+  assert.equal(productA.popularityScore, 1);
+});
+
+test("checkout avec variante stock 1 et quantité 2 est refusé sans stock négatif", async () => {
+  const req = createReq({ user: customerUser });
+  const variant = await createVariant(productA, { name: "Bleu", stock: 1 });
+  const cart = await cartService.getOrCreateCart(req);
+  await models.CartItem.create({ cartId: cart.id, productId: productA.id, variantId: variant.id, qty: 2 });
+
+  await assert.rejects(
+    () => orderService.createOrderFromCart(req, { paymentMethod: "MOBILE_MONEY" }),
+    (err) => err.code === "OUT_OF_STOCK" && err.statusCode === 400
+  );
+
+  await variant.reload();
+  await productA.reload();
+  assert.equal(variant.stock, 1);
+  assert.equal(productA.stock, 10);
+  assert.equal(await models.Order.count(), 0);
+  assert.equal(await models.OrderItem.count(), 0);
+});
+
+test("checkout agrège plusieurs items de la même variante avant vérification stock", async () => {
+  const req = createReq({ user: customerUser });
+  const variant = await createVariant(productA, { name: "Noir", stock: 1 });
+  const cart = await cartService.getOrCreateCart(req);
+  await models.CartItem.create({ cartId: cart.id, productId: productA.id, variantId: variant.id, qty: 1 });
+  await models.CartItem.create({ cartId: cart.id, productId: productA.id, variantId: variant.id, qty: 1 });
+
+  await assert.rejects(
+    () => orderService.createOrderFromCart(req, { paymentMethod: "MOBILE_MONEY" }),
+    (err) => err.code === "OUT_OF_STOCK" && err.statusCode === 400
+  );
+
+  await variant.reload();
+  assert.equal(variant.stock, 1);
+  assert.equal(await models.Order.count(), 0);
+  assert.equal(await models.OrderItem.count(), 0);
 });
 
 test("coupon valide est appliqué et enregistré", async () => {
@@ -295,6 +486,8 @@ test("livraison porte utilise l'adresse client et ajoute les frais actuels", asy
 });
 
 test("méthode CARD initialise provider PayPal et le controller redirige vers le paiement", async () => {
+  env.paypal.clientId = "client-id";
+  env.paypal.clientSecret = "client-secret";
   const req = createReq({
     user: customerUser,
     body: { paymentMethod: "CARD" }

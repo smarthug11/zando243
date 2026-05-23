@@ -4,17 +4,8 @@ const path = require("path");
 const os = require("os");
 const fs = require("fs");
 
-const dbPath = path.join(os.tmpdir(), `zando243-admin-reviews-${process.pid}-${Date.now()}.sqlite`);
 
-process.env.NODE_ENV = "test";
-process.env.SQLITE_STORAGE = dbPath;
-process.env.CSRF_ENABLED = "false";
-process.env.DB_LOG = "false";
-process.env.JWT_ACCESS_SECRET = "test_access_secret";
-process.env.JWT_REFRESH_SECRET = "test_refresh_secret";
-process.env.COOKIE_SECRET = "test_cookie_secret";
-process.env.SESSION_SECRET = "test_session_secret";
-
+require("./_setup-test-db");
 const { sequelize, defineModels, hashPassword } = require("../src/models");
 const adminController = require("../src/controllers/adminController");
 const { requireAuth } = require("../src/middlewares/auth");
@@ -162,7 +153,6 @@ test.beforeEach(async () => {
 
 test.after(async () => {
   await sequelize.close();
-  if (fs.existsSync(dbPath)) fs.unlinkSync(dbPath);
 });
 
 test("un admin connecté peut afficher la page de modération des avis avec les relations nécessaires", async () => {

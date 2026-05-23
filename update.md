@@ -4,6 +4,237 @@ Ce fichier sert de contexte rapide sur les changements apportés au projet : ce 
 
 ---
 
+## 24/05/2026 — Tests UI, CSRF et Better Auth checkout (documentation retroactive)
+
+### Contexte
+
+Audit documentaire revelant 4 fichiers de tests presents dans `tests/` mais non repertories dans `update.md` ni dans la suite de tests de `FONCTIONNALITES.md`. Ces tests ont ete ecrits au fil des phases precedentes mais omis des journaux. Cette entree les documente retroactivement.
+
+---
+
+### 1. `tests/admin-nav-ui.test.js`
+
+Tests de la navigation admin (`src/views/partials/admin-nav.ejs`) via rendu EJS direct.
+
+**Cas couverts :**
+- lien dashboard actif uniquement sur `/admin` (classes `font-bold` et `text-blue-700` presentes) ;
+- lien produits actif pour les sous-pages produit sans activer le dashboard ;
+- lien commandes actif pour les sous-pages commande sans activer le dashboard.
+
+Ces tests ne font pas de requete HTTP : ils rendent le partial EJS avec `ejs.renderFile()` et verifient les classes CSS du lien courant. Permet de verrouiller la logique de mise en evidence de la navigation sans demarrer le serveur.
+
+---
+
+### 2. `tests/product-detail-ui.test.js`
+
+Tests du script inline de la vue `src/views/pages/products/detail.ejs` via `node:vm`.
+
+**Cas couverts :**
+- la miniature marquee `data-main="true"` est selectionnee au chargement ;
+- l'initialisation cible la miniature principale meme si elle n'est pas la premiere dans le DOM ;
+- fallback sur la premiere miniature si aucune n'est marquee principale.
+
+Ces tests extraient le contenu du premier `<script>` du template EJS et l'executent dans un contexte DOM minimal simule (sans navigateur), ce qui permet de verifier la logique JavaScript independamment de l'infrastructure serveur.
+
+---
+
+### 3. `tests/csrf.test.js`
+
+Tests de la protection CSRF sur les formulaires SSR, avec `CSRF_ENABLED=true`.
+
+**Cas couverts :**
+- `GET /auth2/login` puis `POST /auth2/login` en nouvelle session : le token CSRF extrait du formulaire HTML est inclus dans le POST — la requete n'est pas bloquee (pas de 403) ;
+- `GET /products` puis `POST /cart/items` en nouvelle session : meme verification sur l'ajout panier.
+
+Ces tests valident que le flux normal d'un navigateur (GET pour obtenir le token, POST avec le token inclus dans `_csrf`) n'est pas bloque par le middleware `csrf-csrf`. Ils garantissent que la migration de `csurf` vers `csrf-csrf` n'a pas casse les formulaires.
+
+---
+
+### 4. `tests/better-auth-checkout-admin.test.js`
+
+Tests d'integration du checkout et de l'acces admin sous Better Auth.
+
+**Cas couverts :**
+- un CUSTOMER Better Auth sans `emailVerifiedAt` ne peut pas checkout (`EMAIL_NOT_VERIFIED`) ;
+- un CUSTOMER Better Auth avec `emailVerifiedAt` peut checkout (commande creee en base, panier vide) ;
+- un ADMIN Better Auth peut acceder a `/admin` (200) ;
+- un CUSTOMER Better Auth est refuse sur `/admin` via `requireRole` (403) ;
+- le reset password incremente `refreshTokenVersion` dans la table `users` (comportement herite conserve en base meme si les JWT ne sont plus emis — colonne legacy orpheline non encore supprimee).
+
+---
+
+### Synthese
+
+### Ajoute (retroactivement documente)
+- `tests/admin-nav-ui.test.js` — 3 tests navigation admin EJS
+- `tests/product-detail-ui.test.js` — 3 tests script inline detail produit
+- `tests/csrf.test.js` — 2 tests flux CSRF navigateur
+- `tests/better-auth-checkout-admin.test.js` — 5 tests checkout + acces admin Better Auth
+
+### Modifie
+- `FONCTIONNALITES.md` :
+  - "Bug connu requestReturn" retire (bug corrige le 25/04/2026) ;
+  - routes : ajout `/auth2 -> auth2Routes.js`, mention du redirect 308 sur `/auth` ;
+  - rate limit : reference corrigee de `authRoutes.js` vers `auth2Routes.js` ;
+  - suite de tests mise a jour de 21 a 30 fichiers avec descriptions des nouveaux fichiers ;
+  - section "Prochaines actions" : ajout des items renommage `/auth2`, nettoyage colonnes legacy, nettoyage vars JWT.
+
+---
+
+## 23/05/2026 — Migration vers Better Auth + suppression complète du système JWT legacy
+
+### Contexte
+
+Le système d'authentification historique (JWT access/refresh en cookies `httpOnly`) a été entièrement remplacé par **Better Auth** comme système principal et unique. Motivation : préparer l'intégration future de MFA (TOTP, passkeys) et déléguer la gestion auth à une lib maintenue plutôt que de maintenir du code custom.
+
+La migration s'est faite en **5 phases**, avec une couverture de tests complète (HTTP + service) à chaque étape. Aucun bug fonctionnel introduit, suite test 336/336 verte à la fin.
+
+---
+
+### Phase 0 — Audit (préalable)
+
+Vérification du périmètre Better Auth déjà en place : module `src/auth-be/` configuré, migrations `auth_user`/`auth_session`/`auth_account`/`auth_verification` créées, controller `auth2Controller` proxy vers `auth.handler()`, vues SSR `src/views/pages/auth2/` (register, login, forgot-password, reset-password). Tous les forms incluaient déjà `_csrf`. 5 tests BA existants couvraient mount/mirror/session/SSR/checkout.
+
+---
+
+### Phase 1 — Better Auth activé par défaut et navbar bascule
+
+- `src/config/env.js` : `betterAuthEnabled` passe de `false` à `true` par défaut.
+- `.env.example` : `BETTER_AUTH_ENABLED=true`.
+- `src/views/partials/navbar.ejs` : tous les liens auth pointent vers `/auth2/*` (6 occurrences).
+- `src/views/pages/cart.ejs` et `src/views/pages/products/detail.ejs` : liens `/auth/login` → `/auth2/login`.
+
+---
+
+### Phase 6a — Tests unitaires service Better Auth (nouveau fichier)
+
+Création de `tests/better-auth-service.test.js` avec 14 cas :
+
+- `signUpEmail` crée `auth_user` + `auth_account` + mirror `users` avec id partagé ;
+- politique de mot de passe BA appliquée (< 12 caractères refusé, blocklist, > 72 octets) ;
+- `role: "ADMIN"` injecté dans le body est ignoré (reste `CUSTOMER`) ;
+- email déjà utilisé refusé ;
+- `signInEmail` retourne user pour identifiants valides, échoue sinon ;
+- `requestPasswordReset` + `resetPassword` change effectivement le mot de passe ;
+- `signOut` sans session no-op gracieux ;
+- mirror copie firstName/lastName/email correctement, `emailVerifiedAt` reste `null` par défaut.
+
+---
+
+### Phase 2a — Refonte du seed via API Better Auth
+
+`src/seeders/202602240002-demo-data.js` :
+
+- Cleanup étendu aux tables BA (`auth_session`, `auth_verification`, `auth_account`, `auth_user`).
+- Les 12 users demo (2 admins + 10 customers) sont maintenant créés via `auth.api.signUpEmail()` programmatiquement, puis enrichis via `bulkUpdate` pour :
+  - `role: "ADMIN"` sur `auth_user` ET `users` pour admin1/admin2 ;
+  - `phone`, `avatar_url`, `loyalty_points`, `email_verified_at`, `created_at` sur `users`.
+- Le mot de passe `Password123!` est désormais hashé par BA (scrypt) dans `auth_account.password`, plus de bcrypt direct.
+- Le seeder charge `dotenv` en tête pour avoir accès à `BETTER_AUTH_SECRET`.
+
+Validation : `npm run seed` → 12 lignes dans `auth_user`, 12 dans `auth_account`, 12 dans `users`. Login admin1@zando243.local fonctionne du premier coup via `/auth2/login`.
+
+---
+
+### Phase 2b (rendue caduque par Phase 5)
+
+Une détection des users legacy (`isLegacyUserOnly`) avait été ajoutée temporairement dans `auth2Controller.login` pour rediriger les anciens comptes JWT vers `/auth2/forgot-password`. Retirée en Phase 5 car plus aucun user legacy n'existe après le nouveau seed.
+
+---
+
+### Phase 6b — Tests HTTP /auth2 complets (nouveau fichier)
+
+Création de `tests/auth2-http.test.js` avec 14 cas :
+
+**Register** : succès complet, password trop court refusé, email duplicate refusé.
+**Login** : succès, mauvais password refusé, email inconnu refusé.
+**Logout** : session BA détruite côté serveur, cookie purgé, accès post-logout impossible.
+**Forgot password** : email existant et inconnu retournent le même flash opaque (anti-énumération).
+**Session loading** : cookie BA permet l'accès à `/account/profile`, sans cookie → refus.
+**Role-based** : CUSTOMER bloqué sur `/admin` (403), ADMIN passe (200).
+**Cart merge** : panier invité fusionne dans le panier user au login.
+
+---
+
+### Phase 3 — `loadCurrentUser` priorité Better Auth
+
+`src/middlewares/auth.js` : inversion de la priorité. Better Auth est lu en premier ; le JWT legacy n'était plus utilisé que comme fallback (puis retiré en Phase 5).
+
+---
+
+### Phase 4 — Redirects 308 `/auth/*` → `/auth2/*`
+
+`src/routes/authRoutes.js` réécrit : chaque route legacy retourne un redirect 308 (préserve la méthode HTTP) vers son équivalent `/auth2/*`. `/auth/refresh` retourne 410 Gone (le refresh JWT n'a pas d'équivalent BA — la session BA est gérée automatiquement). Le routes legacy seront définitivement supprimées en Phase 5.
+
+---
+
+### Phase 5 — Suppression complète du code JWT legacy
+
+**Fichiers supprimés** :
+
+- `src/config/jwt.js`
+- `src/services/authService.js`
+- `src/controllers/authController.js`
+- `src/routes/authRoutes.js`
+- `src/views/pages/auth/` (4 vues : register, login, forgot-password, reset-password)
+- `tests/auth-service.test.js` (testait l'authService legacy)
+
+**Code modifié** :
+
+- `src/auth-be/hooks.mjs` : `mirrorUserToSequelize` ne pose plus `passwordHash: "BETTER_AUTH_MANAGED"`. Les nouveaux users BA ont `passwordHash: null` côté mirror.
+- `src/controllers/auth2Controller.js` : helper `clearBaCookies` inline (ne dépend plus de `authService`). Détection legacy retirée.
+- `src/middlewares/auth.js` : réécrit en mode BA-only. Plus de lecture de cookies JWT. `requireFreshAdminSession` clear les cookies BA en cas d'idle timeout.
+- `src/routes/index.js` : mount `/auth` retiré, `/auth2` monté inconditionnellement.
+- `src/config/env.js` : section `jwt` retirée (secrets, TTL).
+- `tests/better-auth-mirror.test.js` et `tests/better-auth-service.test.js` : asserts `passwordHash === null` au lieu du sentinel.
+
+**Dépendances** :
+
+- `npm uninstall jsonwebtoken`.
+
+**Validation finale** : `npm test` → 336 tests, 336 passes, 0 fail.
+
+---
+
+### Volontairement NON fait dans cette migration
+
+- Migration SQL `DROP COLUMN` sur `users` pour retirer `password_hash`, `refresh_token_version`, `failed_login_attempts`, `locked_until`, `email_verification_token_hash`, `reset_password_token_hash`, `reset_password_expires_at`. Les colonnes restent en base, orphelines, en attendant validation prod et backup.
+- Variables `JWT_*` dans `.env.example` : laissées en place, inoffensives mais à nettoyer dans une PR séparée.
+- Renommage `/auth2/*` → `/auth/*` pour avoir des URLs propres : à faire plus tard quand les redirects 308 ne sont plus utilisés par personne.
+
+---
+
+### Effets de bord à connaître
+
+- Tout cookie `accessToken` / `__Host-accessToken` / `refreshToken` / `__Host-refreshToken` restant dans un navigateur est ignoré → l'utilisateur doit se reconnecter via `/auth2/login`. Acceptable : aucune perte de données, juste un re-login.
+- L'endpoint `POST /auth/refresh` n'existe plus (404 désormais, car `authRoutes.js` supprimé). Aucun client JS n'appelait ce endpoint dans le projet.
+- BUG-001 (vérification email impossible avant paiement) est de facto **résolu** : Better Auth envoie l'email de vérification automatiquement via le hook `sendVerificationEmail` dans `src/auth-be/index.mjs`. Le checkout reste bloqué tant que `users.email_verified_at` est `null`, mais le user a maintenant un chemin pour vérifier.
+
+---
+
+### Synthèse rapide
+
+#### Ajouté
+- Better Auth comme système d'auth unique (sign-up/in/out, reset password, verify email, sessions).
+- Migration des users demo via API BA dans le seeder (scrypt natif au lieu de bcrypt manuel).
+- 28 nouveaux tests dédiés BA (14 service + 14 HTTP) couvrant tous les flows critiques.
+- Redirects 308 sur les anciennes routes `/auth/*` pour préserver les bookmarks externes.
+
+#### Retiré
+- Tout le code JWT legacy : `jwt.js`, `authService.js`, `authController.js`, `authRoutes.js`, vues legacy, tests legacy.
+- Dépendance `jsonwebtoken`.
+- Branche JWT dans `loadCurrentUser`.
+- Section `env.jwt` dans la config.
+- Sentinel `"BETTER_AUTH_MANAGED"` dans le mirror hook (devenu inutile).
+
+#### Modifié
+- `loadCurrentUser` ne lit plus que les sessions Better Auth.
+- `requireFreshAdminSession` clear les cookies BA en cas d'idle timeout admin.
+- Tous les liens auth dans les vues pointent vers `/auth2/*`.
+- Le seed crée les users via API BA (les credentials sont les mêmes qu'avant).
+
+---
+
 ## 30/03/2026 — Corrections sécurité (SAST) + Audit logs
 
 ### Contexte
@@ -2152,3 +2383,195 @@ Les logs d'erreur visibles pendant les tests correspondent aux cas negatifs atte
 
 ### Non modifie
 - `src/services/emailService.js` : lu et compare au changelog Nodemailer v8, mais aucun changement code requis.
+
+---
+
+## 26/04/2026 — Correctifs securite avances (cookies __Host-, sanitisation HTML, CSRF, stock transactionnel)
+
+### Contexte
+
+Session de corrections securite approfondies suite a l'audit OWASP ASVS L1 realise le 26/04/2026 (rapport : `security-audits/ASVS_L1_AUDIT_2026-04-26_17-13-07.md`). Les changements couvrent le durcissement des cookies, la sanitisation HTML des entrees, le CSRF sur le refresh token, le verrouillage transactionnel des stocks, l'entropie des identifiants generes, la validation qualite des secrets de production, et la limitation bcrypt sur les mots de passe. Les rapports de securite existants ont ete reorganises dans un dossier dedie `security-audits/`.
+
+---
+
+### 1. `app.js` — Middleware de validation Content-Type
+
+**Probleme :** Les routes POST/PATCH/PUT/DELETE acceptaient n'importe quel Content-Type sans controle, exposant les parsers a des requetes malformees.
+
+**Ce qui a change :**
+- Ajout d'un middleware `validateContentType` applique avant les parsers Express.
+- Les methodes avec corps (`POST`, `PATCH`, `PUT`, `DELETE`) doivent envoyer un Content-Type dans la liste autorisee : `application/x-www-form-urlencoded`, `application/json`, `multipart/form-data`.
+- Toute requete avec un Content-Type non supporte recoit un `415 Unsupported Content-Type`.
+- Exception : `/payments/paypal/webhook` est exempte (PayPal envoie son propre Content-Type).
+
+---
+
+### 2. `src/config/env.js` — Validation de la qualite des secrets en production
+
+**Probleme :** La verification existante bloquait seulement si la variable d'environnement etait absente. Une valeur presente mais faible (placeholder court, mot `secret`, `unsafe`, `change_me`) passait sans avertissement.
+
+**Ce qui a change :**
+- Ajout de `validateProductionSecret(name, value)` appelee apres lecture de chaque secret.
+- En production, si le secret fait moins de 32 caracteres ou contient un fragment interdit (`change_me`, `unsafe`, `secret`), le serveur leve une exception au demarrage et refuse de tourner.
+- Concerne : `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `COOKIE_SECRET`, `SESSION_SECRET`.
+
+---
+
+### 3. `src/config/jwt.js` — Email retire du payload access token
+
+**Probleme :** Le payload de l'access token contenait `email`. Tout serveur validant ce JWT pouvait lire l'email de l'utilisateur, augmentant la surface d'exposition en cas de fuite ou de log du token.
+
+**Ce qui a change :**
+- Le champ `email` a ete retire du payload. Le token ne contient plus que `sub`, `role` et `type`.
+- L'email reste disponible via la base via `req.user.email` quand necessaire.
+
+---
+
+### 4. `src/middlewares/auth.js` + `src/services/authService.js` — Cookies `__Host-` en production
+
+**Probleme :** Les cookies `accessToken` et `refreshToken` etaient nommes de maniere simple, sans protection supplementaire du navigateur contre les sous-domaines malveillants.
+
+**Ce qui a change :**
+- En production (`env.isProd`), les cookies sont maintenant emis sous les noms `__Host-accessToken` et `__Host-refreshToken`.
+- Le prefixe `__Host-` impose au navigateur : `Secure`, `path=/`, et absence de `Domain` — rendant impossible le vol de cookie par un sous-domaine.
+- Le `path: "/"` a ete rendu explicite dans les options de cookie.
+- Les fonctions `getAccessTokenFromRequest`, `clearAccessCookie`, `clearRefreshCookie` et `getRefreshTokenFromRequest` gèrent les deux noms pour assurer la compatibilite lors de la migration.
+- `clearAuthCookies` efface les deux noms (ancien et nouveau) pour eviter les cookies orphelins.
+
+Fichiers concernes :
+- `src/middlewares/auth.js`
+- `src/services/authService.js`
+- `src/controllers/authController.js`
+
+---
+
+### 5. `src/middlewares/csrf.js` — CSRF actif sur `/auth/refresh`
+
+**Probleme :** La route `POST /auth/refresh` etait dans la liste d'exemptions CSRF. Un attaquant pouvant executer une requete cross-site pouvait forcer un refresh et obtenir de nouveaux tokens.
+
+**Ce qui a change :**
+- Retrait de `/auth/refresh` de `exemptPaths`.
+- CSRF desormais actif sur toutes les routes non GET sauf `/payments/paypal/webhook`.
+
+---
+
+### 6. `src/middlewares/validators.js` + `package.json` — Sanitisation HTML complete
+
+**Probleme :** `sanitizeValue()` remplacait seulement `<` et `>` par une chaine vide, ce qui ne bloquait pas les attributs `onerror=`, les URIs `javascript:`, ni les balises avec syntaxe alternative.
+
+**Ce qui a change :**
+- Remplacement du strip manuel par `sanitize-html` avec `allowedTags: []` et `allowedAttributes: {}`.
+- Tout HTML est maintenant completement supprime du contenu texte des entrees.
+- Ajout de `sanitize-html@^2.17.3` dans `package.json`.
+
+---
+
+### 7. `src/routes/cartRoutes.js` + `src/controllers/cartController.js` — Validation qty sur la mise a jour du panier
+
+**Probleme :** Les routes `PATCH /cart/items/:id` et `POST /cart/items/:id` n'avaient pas de validateurs sur le champ `qty`. Une valeur manquante ou hors plage n'etait pas rejetee cote serveur.
+
+**Ce qui a change :**
+- Ajout de `cartItemUpdateValidators` : `qty` est obligatoire (non falsy) et doit etre un entier entre 1 et 99.
+- Ce validateur est applique sur les deux routes de mise a jour (`PATCH` et `POST`).
+- Message d'erreur explicite : `"La quantite doit etre un entier entre 1 et 99."`.
+
+---
+
+### 8. `src/services/orderService.js` — Verrouillage transactionnel des stocks + entropie CSPRNG
+
+**Probleme 1 (TOCTOU stock) :** Le stock etait verifie a partir du panier charge avant la transaction. Entre la lecture et la transaction, un autre processus pouvait decrementer le stock. Des commandes avec stock negatif etaient theoriquement possibles.
+
+**Probleme 2 (entropie) :** Les numeros de commande, de tracking et les identifiants de fallback utilisaient `Math.random()`, qui n'est pas cryptographiquement sur.
+
+**Ce qui a change :**
+- A l'interieur de la transaction, les `CartItem` sont relus en base.
+- Les `Product` sont ensuite relus avec un verrou de ligne (`FOR UPDATE` sur PostgreSQL via `lock: transaction.LOCK.UPDATE`).
+- Le statut `ACTIVE` des produits est verifie dans la transaction.
+- Le stock est compare apres relecture en base, pas apres precharge.
+- Le sous-total est calcule depuis les produits relus, pas depuis le cache.
+- Tous les appels a `Math.random()` ont ete remplaces par `crypto.randomInt()`.
+
+---
+
+### 9. `src/utils/passwordPolicy.js` — Limite 72 octets UTF-8 (bcrypt)
+
+**Probleme :** bcrypt tronque silencieusement les mots de passe a 72 octets. Deux mots de passe differents uniquement apres le 72eme octet produisaient le meme hash.
+
+**Ce qui a change :**
+- Ajout d'une verification `Buffer.byteLength(password, "utf8") > 72` dans `validatePasswordPolicy`.
+- Si le mot de passe depasse 72 octets en UTF-8, l'inscription et le reset password sont refuses avec un message explicite.
+
+---
+
+### 10. Reorganisation des rapports securite
+
+**Ce qui a change :**
+- `SAST_REPORT.md` et `SAST_REPORT_V2.md` deplaces de la racine vers `security-audits/`.
+- `storage/SAST_REPORT_V2.pdf` deplace vers `security-audits/SAST_REPORT_V2.pdf`.
+- Nouveau rapport : `security-audits/ASVS_L1_AUDIT_2026-04-26_17-13-07.md` (audit OWASP ASVS L1 complet).
+- `security-audits/OWASP_AUDIT.md` centralise les recommandations OWASP.
+
+---
+
+### 11. Tests ajoutes
+
+**Fichiers modifies :**
+- `tests/auth-service.test.js` :
+  - Refus inscription avec mot de passe > 72 octets UTF-8.
+  - Refus reset password avec mot de passe > 72 octets UTF-8.
+- `tests/cart.test.js` :
+  - Refus de `POST /cart/items/:id` avec `qty` invalide via `cartItemUpdateValidators`.
+- `tests/checkout.test.js` :
+  - Checkout utilise le stock relu dans la transaction et ignore le stock precharge perime.
+  - Stock insuffisant apres relecture transactionnelle refuse la commande et garde le panier.
+  - Checkout ne rend jamais le stock negatif meme si la quantite demandee depasse le stock.
+- `tests/smoke.test.js` :
+  - `sanitizeBody` supprime tous les tags HTML en texte brut (fort, img onerror, script).
+
+---
+
+### Synthese rapide
+
+### Ajoute
+- Middleware `validateContentType` (rejet 415 des Content-Types non supportes).
+- Validation qualite des secrets en production (`validateProductionSecret`).
+- Cookies `__Host-` en production pour les tokens auth.
+- Limite 72 octets UTF-8 sur les mots de passe (bcrypt safe).
+- Verrouillage `FOR UPDATE` des produits dans la transaction checkout.
+- Dependance `sanitize-html@^2.17.3`.
+- Rapport `security-audits/ASVS_L1_AUDIT_2026-04-26_17-13-07.md`.
+- `cartItemUpdateValidators` sur les routes de mise a jour du panier.
+
+### Retire
+- Champ `email` du payload JWT access token.
+- Exemption CSRF sur `/auth/refresh`.
+- Strip manuel `<>` dans `sanitizeValue`.
+- `Math.random()` dans les generateurs d'identifiants de commande et de tracking.
+- Fichiers rapports a la racine (`SAST_REPORT.md`, `SAST_REPORT_V2.md`, `storage/SAST_REPORT_V2.pdf`).
+
+### Modifie
+- Lecture et verification du stock faites en base dans la transaction checkout (TOCTOU elimine).
+- Sous-total calcule depuis les produits relus, pas depuis le cache panier.
+- Cookies auth nommes `__Host-accessToken` / `__Host-refreshToken` en production.
+- Sanitisation HTML entrees : passage de strip `<>` a `sanitize-html` complet.
+
+---
+
+## Phase 2C-7 a 2C-10 + fixes (24/05/2026)
+
+### Ajoute
+- **Tests `deleteProductImage`** (7 cas) : suppression normale, promotion `isMain` automatique, cas d'une image non-principale, image d'un autre produit ignoree silencieusement, audit log absent, blocages 403/401.
+- **Tests `addProductVariant` / `updateProductVariant` / `deleteProductVariant`** (15 cas par groupe) : creation avec tous les champs, valeurs null si falsy, stock 0 par defaut, produit/variante inexistant → 404, appartenance a un autre produit, cascade images, pas d'audit log, blocages 403/401.
+- **Tests `orderDetailPage`** (6 cas) : vue + titre avec `orderNumber`, User associe, items, historique de statut, 404 si inexistant, blocages 403/401.
+- **Tests `updateOrder`** (8 cas) : changement de statut persiste, historique cree, audit log `ADMIN_ORDER_STATUS`, points fidelite sur Delivered, notification sur Delivered, stock restaure sur Cancelled, 404 si inexistant, blocages 403/401.
+- **Tests `orderRawPdf` / `orderShippingLabelPdf`** (5 cas chacun) : Content-Type `application/pdf`, Content-Disposition avec numero commande, 404, blocages 403/401.
+- **Tests filtre date `GET /admin/orders`** (4 cas) : `startDate+endDate` plage, `startDate` seul, `endDate` seul, date invalide ignoree.
+- **Tests `finalPrice` recalcule** (2 cas) : recalcul sur changement `priceWithoutDelivery`, recalcul sur changement `weightKg`.
+
+### Corrige
+- **Filtre date `GET /admin/orders` inoperant** (`adminOrderService.js:26`) : `Object.keys(range)` remplace par `Object.getOwnPropertySymbols(range)` — `Op.gte`/`Op.lte` sont des Symbol Sequelize non enumeres par `Object.keys`, le filtre ne s'appliquait jamais.
+- **`finalPrice` non recalcule lors de `updateProduct`** (`adminProductService.js:84-96`) : recalcul explicite via `computeDisplayFinalPrice` ajoute apres `Object.assign` — `Object.assign` bypass les hooks Sequelize `beforeValidate` sur cette instance.
+
+### Compteurs
+- `tests/admin-orders.test.js` : 35 → 38 tests
+- `tests/admin-products.test.js` : 93 → 95 tests

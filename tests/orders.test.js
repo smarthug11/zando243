@@ -4,17 +4,8 @@ const fs = require("fs");
 const path = require("path");
 const os = require("os");
 
-const dbPath = path.join(os.tmpdir(), `zando243-orders-${process.pid}-${Date.now()}.sqlite`);
 
-process.env.NODE_ENV = "test";
-process.env.SQLITE_STORAGE = dbPath;
-process.env.CSRF_ENABLED = "false";
-process.env.DB_LOG = "false";
-process.env.JWT_ACCESS_SECRET = "test_access_secret";
-process.env.JWT_REFRESH_SECRET = "test_refresh_secret";
-process.env.COOKIE_SECRET = "test_cookie_secret";
-process.env.SESSION_SECRET = "test_session_secret";
-
+require("./_setup-test-db");
 const { sequelize, defineModels, hashPassword } = require("../src/models");
 const orderController = require("../src/controllers/orderController");
 const orderRoutes = require("../src/routes/orderRoutes");
@@ -435,4 +426,18 @@ test("utilisateur non connecté est bloqué sur les routes commandes", async () 
   assert.ok(nextError);
   errorHandler(nextError, req, res);
   assert.equal(res.statusCode, 401);
+});
+
+test("GET /orders en invité HTML redirige vers login avec flash", async () => {
+  const req = createReq({
+    user: null,
+    headers: { accept: "text/html" }
+  });
+  const res = createRes();
+
+  const { nextError } = await runHandler(requireAuth, req, res);
+
+  assert.equal(nextError, null);
+  assert.equal(res.redirectTo, "/auth2/login");
+  assert.deepEqual(req.session.flash, { type: "error", message: "Connectez-vous pour continuer." });
 });

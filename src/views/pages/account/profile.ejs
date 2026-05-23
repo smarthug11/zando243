@@ -11,7 +11,7 @@
           <input class="form-input" name="firstName" value="<%= user.firstName %>">
           <input class="form-input" name="lastName" value="<%= user.lastName %>">
         </div>
-        <input class="form-input" name="email" type="email" value="<%= user.email %>">
+        <input class="form-input bg-slate-100 text-slate-600" name="email" type="email" value="<%= user.email %>" readonly aria-readonly="true">
         <input class="form-input" name="phone" value="<%= user.phone || '' %>" placeholder="Téléphone">
         <input class="form-input" name="avatarUrl" value="<%= user.avatarUrl || '' %>" placeholder="Avatar URL">
         <div class="flex items-center justify-between text-sm">

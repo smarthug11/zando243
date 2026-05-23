@@ -1,5 +1,5 @@
 const publicRoutes = require("./publicRoutes");
-const authRoutes = require("./authRoutes");
+const auth2Routes = require("./auth2Routes");
 const accountRoutes = require("./accountRoutes");
 const cartRoutes = require("./cartRoutes");
 const favoriteRoutes = require("./favoriteRoutes");
@@ -10,7 +10,7 @@ const paymentRoutes = require("./paymentRoutes");
 
 function registerRoutes(app) {
   app.use("/", publicRoutes);
-  app.use("/auth", authRoutes);
+  app.use("/auth2", auth2Routes);
   app.use("/account", accountRoutes);
   app.use("/cart", cartRoutes);
   app.use("/favorites", favoriteRoutes);

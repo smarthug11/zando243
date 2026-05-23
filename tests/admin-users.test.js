@@ -4,17 +4,8 @@ const path = require("path");
 const os = require("os");
 const fs = require("fs");
 
-const dbPath = path.join(os.tmpdir(), `zando243-admin-users-${process.pid}-${Date.now()}.sqlite`);
 
-process.env.NODE_ENV = "test";
-process.env.SQLITE_STORAGE = dbPath;
-process.env.CSRF_ENABLED = "false";
-process.env.DB_LOG = "false";
-process.env.JWT_ACCESS_SECRET = "test_access_secret";
-process.env.JWT_REFRESH_SECRET = "test_refresh_secret";
-process.env.COOKIE_SECRET = "test_cookie_secret";
-process.env.SESSION_SECRET = "test_session_secret";
-
+require("./_setup-test-db");
 const { sequelize, defineModels, hashPassword } = require("../src/models");
 const adminController = require("../src/controllers/adminController");
 const { requireAuth } = require("../src/middlewares/auth");
@@ -144,7 +135,6 @@ test.beforeEach(async () => {
 
 test.after(async () => {
   await sequelize.close();
-  if (fs.existsSync(dbPath)) fs.unlinkSync(dbPath);
 });
 
 test("un admin connecté peut afficher la page clients/utilisateurs", async () => {
@@ -208,8 +198,8 @@ test("un admin sur un utilisateur inexistant conserve le comportement actuel", a
   const req = createReq({
     user: adminUser,
     method: "POST",
-    originalUrl: "/admin/users/missing-id/block-toggle",
-    params: { id: "missing-id" },
+    originalUrl: "/admin/users/00000000-0000-4000-8000-000000000000/block-toggle",
+    params: { id: "00000000-0000-4000-8000-000000000000" },
     body: { action: "block" }
   });
 

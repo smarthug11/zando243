@@ -1,10 +1,10 @@
 # FONCTIONNALITES.md - Etat fonctionnel et technique de Zando243
 
-Derniere mise a jour : 26/04/2026 (refactorisation Phase 2 : adminOrderService + adminProductService, securite auth renforcee, CSP activee)
+Derniere mise a jour : 24/05/2026 (Phase 2C-7 a 2C-10 completes : tests deleteProductImage, variantes, orderDetailPage, updateOrder, PDF ; fix filtre date GET /admin/orders ; fix finalPrice non recalcule sur updateProduct — suite : 38 tests admin-orders, 95 tests admin-products, 0 fail)
 
 Ce document resume ce que fait l'application Zando243, les routes principales, les fichiers responsables, les services metier utilises, les protections en place et l'etat de la refactorisation progressive.
 
-Il complete `README.md`, `update.md`, `SAST_REPORT.md` et `SAST_REPORT_V2.md`.
+Il complete `README.md`, `update.md` et les rapports dans `security-audits/`.
 
 ---
 
@@ -25,73 +25,70 @@ Stack principale :
 - EJS cote serveur
 - Sequelize
 - PostgreSQL en production
-- SQLite pour les tests
-- JWT access/refresh en cookies `httpOnly`
-- `helmet` avec CSP active, `csrf-csrf`, `express-rate-limit`, `express-validator`
+- PostgreSQL pour les tests (base `zando243_test`)
+- **Better Auth** comme systeme d'authentification unique (sessions cookies `better-auth.session_token`, scrypt natif)
+- `helmet` avec CSP active, `csrf-csrf`, `express-rate-limit`, `express-validator`, `sanitize-html`
 - logs structures avec `pino`
-- tests avec `node --test`
+- tests avec `node --test` (suite : 336 tests, 0 fail)
 
 ---
 
 ## 2. Etat securite
 
-Deux audits SAST manuels ont ete realises (29/03/2026 et 25/04/2026). Les rapports sont dans `SAST_REPORT.md` et `SAST_REPORT_V2.md`.
+Trois audits de securite ont ete realises (SAST 29/03/2026, SAST V2 25/04/2026, OWASP ASVS L1 26/04/2026). Les rapports sont dans `security-audits/`.
 
 ### Secrets et authentification
 
-- Les secrets JWT, cookies et session sont obligatoires en production.
-- Les JWT sont verifies avec l'algorithme `HS256` force explicitement.
-- Les access tokens et refresh tokens sont distingues par `payload.type`.
-- Les tokens de verification email et reset password ne sont plus affiches dans les messages flash.
+- Les secrets `BETTER_AUTH_SECRET`, `COOKIE_SECRET` et `SESSION_SECRET` sont obligatoires en production.
+- En production, chaque secret doit faire au moins 32 caracteres et ne pas contenir de placeholder (`change_me`, `unsafe`, `secret`) — verifie au demarrage via `validateProductionSecret`.
+- L'authentification est gérée par **Better Auth** (lib maintenue). Les sessions sont stockées en base (`auth_session`) avec un token signé envoyé via le cookie `better-auth.session_token` (`httpOnly`, `sameSite: lax`, `secure` en prod).
+- Les passwords sont hashés par Better Auth (scrypt natif, paramètres par défaut).
 - Le reset password utilise un message neutre pour eviter l'enumeration d'emails.
-- Les cookies auth utilisent `sameSite: "lax"` (compatible retour PayPal cross-site).
+- L'email de vérification est envoyé automatiquement à l'inscription via le hook `sendVerificationEmail` configuré dans `src/auth-be/index.mjs`.
+- Un policy hook BA applique la politique de mot de passe maison (12 chars min, blocklist, ≤72 octets) sur `sign-up` et `reset-password`.
 
 Fichiers concernes :
 
 - `src/config/env.js`
-- `src/config/jwt.js`
-- `src/controllers/authController.js`
-- `src/services/authService.js`
+- `src/auth-be/index.mjs` (config Better Auth, hooks email)
+- `src/auth-be/hooks.mjs` (before/after hooks : policy + mirror + audit log)
+- `src/controllers/auth2Controller.js`
+- `src/middlewares/auth.js` (`loadCurrentUser` lit BA only)
 
 ### Politique de mot de passe
 
 - Minimum 12 caracteres (pas de contraintes majuscule/chiffre/symbole).
+- Maximum 72 octets UTF-8 pour eviter la troncature silencieuse de bcrypt.
 - Blocklist de mots de passe evidents : `123456789012`, `zando2431234`, `qwerty123456`, etc.
 - Verifiee a l'inscription et au reset password.
-- Affiche un message d'erreur specifique si le mot de passe est trop court ou dans la blocklist.
+- Affiche un message d'erreur specifique si le mot de passe est trop court, trop long ou dans la blocklist.
 
 Fichiers concernes :
 
-- `src/utils/passwordPolicy.js`
-- `src/services/authService.js`
-- `src/controllers/authController.js`
-- `src/views/pages/auth/register.ejs` (hint UI : "12 caracteres minimum")
+- `src/utils/passwordPolicy.js` (validation maison)
+- `src/auth-be/hooks.mjs` (`enforcePasswordPolicy` via beforeHook BA)
+- `src/views/pages/auth2/register.ejs` (hint UI : "12 caracteres minimum")
 
 ### Verrouillage de compte (brute-force)
 
-- Apres 10 tentatives de connexion echouees consecutives, le compte est verrouille 15 minutes.
-- Pendant le verrouillage, meme le bon mot de passe est refuse (code HTTP 423).
-- Un login reussi hors verrouillage remet `failedLoginAttempts` a 0 et efface `lockedUntil`.
-- Champs en base : `failedLoginAttempts` (INTEGER) et `lockedUntil` (DATE).
-- Migration : `src/migrations/202604250001-add-user-lockout-fields.js`.
-
-Note : le schema initial `202602240001-init-schema.js` inclut deja ces colonnes ; la migration 202604250001 n'est utile que pour les bases existantes avant cette date.
+Better Auth gère le rate limiting des tentatives de connexion via `express-rate-limit` (5 tentatives par fenêtre de 15 min sur `POST /auth2/login`). Les anciennes colonnes `failedLoginAttempts` / `lockedUntil` sur `users` ne sont plus utilisées (legacy JWT) — elles restent en base en attente de cleanup SQL.
 
 Fichiers concernes :
 
-- `src/services/authService.js` (logique `loginUser`)
-- `src/models/index.js` (champs `failedLoginAttempts`, `lockedUntil`)
+- `src/middlewares/rateLimit.js` (`loginRateLimit`)
+- `src/routes/auth2Routes.js`
 
-### Rotation du refresh token
+### Gestion de session
 
-- Chaque appel a `POST /auth/refresh` incremente `refreshTokenVersion` en base.
-- L'ancien refresh token est immediatement invalide apres rotation.
-- Un reset password incremente aussi `refreshTokenVersion`, invalidant toutes les sessions actives.
+- Les sessions Better Auth sont stockées dans `auth_session` avec un `expiresAt` (7 jours par défaut).
+- La rotation/refresh est gérée automatiquement par Better Auth côté serveur (pas d'endpoint exposé côté client).
+- Le sign-out (`POST /auth2/logout`) appelle l'API Better Auth pour supprimer la ligne en base + purge le cookie navigateur via `clearBaCookies`.
+- Reset password : Better Auth invalide toutes les sessions actives du user automatiquement.
 
 Fichiers concernes :
 
-- `src/services/authService.js` (`refreshSession`, `resetPassword`)
-- `src/config/jwt.js`
+- `src/controllers/auth2Controller.js` (`login`, `logout`, `clearBaCookies`)
+- `src/auth-be/index.mjs` (config session BA)
 
 ### Session admin idle timeout
 
@@ -117,7 +114,7 @@ Fichiers concernes :
 
 - `app.js`
 - `src/middlewares/rateLimit.js`
-- `src/routes/authRoutes.js`
+- `src/routes/auth2Routes.js` (rate limits login, register, reset password depuis la migration Better Auth)
 
 ### Content Security Policy (CSP)
 
@@ -146,7 +143,8 @@ Fichiers concernes :
 
 - Passage de `csurf` vers `csrf-csrf` (double submit cookie pattern).
 - Le secret CSRF est derive du `cookieSecret`.
-- Exemptions : `/auth/refresh` et `/payments/paypal/webhook`.
+- Exemption unique : `/payments/paypal/webhook` (PayPal ne peut pas envoyer de token CSRF).
+- `/auth/refresh` n'est plus exempte et est maintenant protege par CSRF.
 - Actif en production et quand `CSRF_ENABLED=true` en developpement.
 
 Fichiers concernes :
@@ -198,9 +196,29 @@ Fichiers concernes :
 - `src/services/adminProductService.js`
 - `src/utils/escapeLike.js`
 
-### Sanitization entrees
+### Sanitisation entrees
 
-- `sanitizeBody` et `sanitizeQuery` dans `src/middlewares/validators.js` strippent les caracteres `<` et `>` de toutes les valeurs string recursivement.
+- `sanitizeBody` et `sanitizeQuery` dans `src/middlewares/validators.js` utilisent `sanitize-html` avec `allowedTags: []` et `allowedAttributes: {}`.
+- Tout HTML est completement supprime des valeurs string de maniere recursive (balises, attributs, URIs `javascript:`, handlers `onerror`, etc.).
+
+### Content-Type validation
+
+- Un middleware `validateContentType` est applique avant les parsers Express.
+- Les requetes `POST`, `PATCH`, `PUT`, `DELETE` doivent fournir un Content-Type parmi : `application/x-www-form-urlencoded`, `application/json`, `multipart/form-data`.
+- Tout autre Content-Type reçoit un `415 UNSUPPORTED_CONTENT_TYPE`.
+- Exception : `/payments/paypal/webhook`.
+
+Fichier concerne :
+
+- `app.js`
+
+### Entropie des identifiants generes
+
+- Les numeros de commande, de tracking et leurs fallbacks utilisent `crypto.randomInt()` (CSPRNG) au lieu de `Math.random()`.
+
+Fichier concerne :
+
+- `src/services/orderService.js`
 
 ### Logs et erreurs
 
@@ -213,18 +231,6 @@ Fichiers concernes :
 - `src/middlewares/errorHandler.js`
 - `src/utils/logger.js`
 
-### Bug connu : requestReturn
-
-Le code actuel dans `src/services/orderService.js` (`requestReturn`) contient une condition inversee :
-
-```js
-if (order.status === "Delivered") {
-  throw new AppError("Retour refusé: commande déjà livrée", 400, "RETURN_NOT_ALLOWED_DELIVERED");
-}
-```
-
-Cela bloque les retours pour les commandes livrees, alors que la logique attendue est de les autoriser uniquement pour les commandes au statut `Delivered`. Ce bug a probablement ete reintroduit pendant la refactorisation. A corriger : remplacer `=== "Delivered"` par `!== "Delivered"`.
-
 ---
 
 ## 3. Routes publiques
@@ -232,7 +238,8 @@ Cela bloque les retours pour les commandes livrees, alors que la logique attendu
 Routes montees depuis `src/routes/index.js` :
 
 - `/` -> `src/routes/publicRoutes.js`
-- `/auth` -> `src/routes/authRoutes.js`
+- `/auth` -> redirects 308 permanents vers `/auth2/*` (compatibilite bookmarks/liens externes ; `authRoutes.js` supprime le 23/05/2026)
+- `/auth2` -> `src/routes/auth2Routes.js` (Better Auth — systeme d'auth actif)
 - `/cart` -> `src/routes/cartRoutes.js`
 - `/favorites` -> `src/routes/favoriteRoutes.js`
 - `/account` -> `src/routes/accountRoutes.js`
@@ -368,57 +375,69 @@ Tests :
 
 ---
 
-## 5. Authentification
+## 5. Authentification (Better Auth)
+
+Toute l'auth est gérée par **Better Auth**. Le système JWT historique (`/auth/*`) a été supprimé le 23/05/2026. Les anciennes routes `/auth/*` redirigent en 308 vers `/auth2/*` (compatibilité bookmarks/liens externes uniquement).
 
 ### 5.1 Inscription
 
 Ce que ca fait :
 
-- cree un compte client avec role `CUSTOMER` ;
-- valide la politique de mot de passe (12 car. min, blocklist) ;
-- hash le mot de passe avec bcrypt (10 rounds) ;
-- prepare le flux de verification email (token hash en base, token non affiche) ;
-- applique un rate limit dedie (`registerRateLimit` : 5/heure) ;
-- cree un audit log `AUTH / USER_REGISTER` ;
-- fusionne le panier invite dans le panier connecte.
+- envoie un sign-up Better Auth via l'API interne (`auth.handler` proxy depuis `auth2Controller.register`) ;
+- BA crée la ligne dans `auth_user` + `auth_account` (password scrypt) + session ;
+- le hook `afterHook` mirrore le user dans la table `users` (mêmes id/email/firstName/lastName, role `CUSTOMER`, passwordHash `null`) ;
+- envoie l'email de vérification automatiquement (hook `sendVerificationEmail` → SMTP) ;
+- politique de mot de passe maison appliquée via `beforeHook` (12 chars min, blocklist, ≤72 octets) ;
+- audit log `AUTH / USER_REGISTER` écrit ;
+- fusion du panier invité dans le panier connecté ;
+- rate limit dédié `registerRateLimit` (5/heure).
 
 Fichiers :
 
-- Routes : `GET /auth/register`, `POST /auth/register`
-- Controller : `src/controllers/authController.js`
-- Service : `src/services/authService.js`
+- Routes : `GET /auth2/register`, `POST /auth2/register`
+- Controller : `src/controllers/auth2Controller.js`
+- Service BA : `src/auth-be/index.mjs` (config + hooks email)
+- Hooks BA : `src/auth-be/hooks.mjs` (policy + mirror + audit)
 - Util : `src/utils/passwordPolicy.js`
-- Vue : `src/views/pages/auth/register.ejs`
+- Vue : `src/views/pages/auth2/register.ejs`
 
 Acces : visiteurs non connectes.
 
+Tests :
+
+- `tests/auth2-http.test.js` (succès, password court refusé, email duplicate refusé)
+- `tests/better-auth-service.test.js` (sign-up API, policy, mirror, anti role injection)
+- `tests/better-auth-mirror.test.js` (mirror users + audit log)
+- `tests/better-auth-ssr.test.js` (parcours SSR complet)
+
 ---
 
-### 5.2 Connexion / refresh / logout
+### 5.2 Connexion / logout
 
 Ce que ca fait :
 
-- connecte l'utilisateur apres verification identifiants, statut actif et verrouillage ;
-- incremente `failedLoginAttempts` en cas d'echec ; verrouille 15 min apres 10 echecs ;
-- remet `failedLoginAttempts` a 0 apres un succes ;
-- cree access token (15 min) et refresh token (7 jours) en cookies `httpOnly` ;
-- `POST /auth/refresh` : verifie le refresh token, incremente `refreshTokenVersion` (l'ancien token est revoque) ;
-- `POST /auth/logout` : incremente `refreshTokenVersion` et efface les cookies ;
-- fusionne le panier invite au login ;
-- redirige vers `/admin` si role `ADMIN`, vers `/` sinon.
+- `POST /auth2/login` : appelle `auth.api.signInEmail` → BA pose le cookie `better-auth.session_token` (durée 7 jours par défaut) ;
+- audit log `AUTH / USER_LOGIN` écrit via `afterHook` BA ;
+- fusion du panier invité au login ;
+- redirige vers `/admin` si role `ADMIN`, vers `/` sinon ;
+- `POST /auth2/logout` : appelle `auth.handler('/api/auth/sign-out')` → BA détruit la ligne en `auth_session` ; le helper `clearBaCookies` purge le cookie côté navigateur en fallback ;
+- audit log `AUTH / USER_LOGOUT` écrit via `beforeHook` BA ;
+- rate limit dédié `loginRateLimit` (5/15min).
 
 Fichiers :
 
-- Routes : `GET /auth/login`, `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout`
-- Controller : `authController`
-- Services : `authService`, `src/config/jwt.js`
-- Vue : `src/views/pages/auth/login.ejs`
+- Routes : `GET /auth2/login`, `POST /auth2/login`, `POST /auth2/logout`
+- Controller : `src/controllers/auth2Controller.js` (`login`, `logout`, `clearBaCookies`)
+- Service BA : `src/auth-be/index.mjs`
+- Vue : `src/views/pages/auth2/login.ejs`
 
-Acces : login/logout pour visiteurs, refresh selon cookies.
+Acces : login pour visiteurs, logout pour utilisateurs connectés.
 
 Tests :
 
-- `tests/auth-service.test.js` (verrouillage, rotation refresh token, politique mot de passe)
+- `tests/auth2-http.test.js` (succès login, bad password, email inconnu, logout détruit session, accès post-logout impossible)
+- `tests/better-auth-session.test.js` (session loading par cookie)
+- `tests/better-auth-mirror.test.js` (audit log USER_LOGIN / USER_LOGOUT)
 
 ---
 
@@ -426,17 +445,17 @@ Tests :
 
 Ce que ca fait :
 
-- `GET /auth/verify-email/:token` verifie le token (compare le hash SHA-256) ;
-- marque `emailVerifiedAt` et efface le hash en base ;
-- redirige vers `/account/profile`.
+- BA envoie l'email automatiquement à l'inscription (`sendOnSignUp: true` dans `src/auth-be/index.mjs`) ;
+- le lien dans l'email pointe sur `/api/auth/verify-email?token=...` ;
+- le `afterHook` met à jour `emailVerifiedAt` dans la table `users` ;
+- `autoSignInAfterVerification: true` : le user est automatiquement connecté après vérification.
 
-Note : un email non verifie bloque le checkout (voir section 6.3).
+Note : un email non vérifié bloque le checkout (voir section 6.3).
 
 Fichiers :
 
-- Route : `GET /auth/verify-email/:token`
-- Controller : `authController.verifyEmail()`
-- Service : `authService.verifyEmailToken()`
+- Route : `GET/POST /api/auth/verify-email` (handler BA natif)
+- Hook mirror : `src/auth-be/hooks.mjs` (afterHook sur `/verify-email`)
 
 Acces : visiteurs avec token valide.
 
@@ -446,21 +465,27 @@ Acces : visiteurs avec token valide.
 
 Ce que ca fait :
 
-- demande de reset avec message neutre (pas d'enumeration email) ;
-- token hash SHA-256 stocke en base, expire apres 1 heure ;
-- reset verifie la politique de mot de passe ;
-- incremente `refreshTokenVersion` apres reset (invalide toutes les sessions) ;
-- rate limit dedie (`resetPasswordRateLimit` : 10/heure).
+- `POST /auth2/forgot-password` : appelle `auth.handler('/api/auth/request-password-reset')` ;
+- BA crée une ligne `auth_verification` avec un token et envoie l'email via `sendResetPasswordEmail` ;
+- réponse opaque pour éviter l'énumération d'emails (même flash que l'email existe ou non) ;
+- `POST /auth2/reset-password` : appelle `auth.handler('/api/auth/reset-password')` avec le token ;
+- BA vérifie le token, met à jour le hash scrypt dans `auth_account.password`, invalide les sessions actives ;
+- la politique de mot de passe maison s'applique via `beforeHook` (12 chars min, blocklist, ≤72 octets) ;
+- rate limit dédié `resetPasswordRateLimit` (10/heure).
 
 Fichiers :
 
-- Routes : `GET /auth/forgot-password`, `POST /auth/forgot-password`, `GET /auth/reset-password/:token`, `POST /auth/reset-password/:token`
-- Controller : `authController`
-- Service : `authService`
-- Util : `src/utils/passwordPolicy.js`
-- Vues : `forgot-password.ejs`, `reset-password.ejs`
+- Routes : `GET/POST /auth2/forgot-password`, `GET/POST /auth2/reset-password`
+- Controller : `src/controllers/auth2Controller.js` (`requestPasswordReset`, `resetPassword`)
+- Hook policy : `src/auth-be/hooks.mjs` (`beforeHook` sur `/reset-password`)
+- Vues : `forgot-password.ejs`, `reset-password.ejs` (dans `src/views/pages/auth2/`)
 
 Acces : visiteurs non connectes.
+
+Tests :
+
+- `tests/auth2-http.test.js` (anti-énumération opaque)
+- `tests/better-auth-service.test.js` (`requestPasswordReset` + `resetPassword` changent effectivement le hash)
 
 ---
 
@@ -518,7 +543,7 @@ Ce que ca fait :
   - livraison domicile (`doorDelivery=true`) : frais livraison = 5, tracking format `ITS-D-YYYYMMDD-XXXXXX` ;
 - applique un coupon si valide (verrouillage ligne en transaction) ;
 - accepte les methodes CASH_ON_DELIVERY, CARD, MOBILE_MONEY, PAYPAL ;
-- dans une seule transaction : numero de commande unique genere, commande et items crees, stock decremente, popularite incrementee ;
+- dans une seule transaction : les `CartItem` sont relus en base, les `Product` sont relus et verrouilles (`FOR UPDATE` sur PostgreSQL), le statut `ACTIVE` et le stock suffisant sont verifies depuis les donnees relues (eliminant le TOCTOU stock), numero de commande unique genere, commande et items crees, stock decremente, popularite incrementee ;
 - historique de statut initialise a `Processing` ;
 - notification `ORDER_CREATED` creee ;
 - facture PDF generee ;
@@ -538,6 +563,7 @@ Acces : clients connectes avec email verifie.
 Tests :
 
 - `tests/checkout.test.js`
+- `tests/better-auth-checkout-admin.test.js` (checkout email verifie/non verifie avec Better Auth, acces admin RBAC)
 
 ---
 
@@ -657,15 +683,11 @@ Tests :
 
 ### 8.4 Demande de retour client
 
-Ce que ca fait attendu :
+Ce que ca fait :
 
 - permet au client de demander un retour sur une commande ;
 - autorise la demande uniquement si la commande est au statut `Delivered` ;
 - bloque la demande pour tout autre statut.
-
-Etat actuel :
-
-BUG ACTIF. La condition dans `src/services/orderService.js` (`requestReturn`) est inversee : elle leve une erreur si `order.status === "Delivered"`, bloquant ainsi les retours des commandes livrees. Correction requise : remplacer `=== "Delivered"` par `!== "Delivered"`.
 
 Fichiers :
 
@@ -982,7 +1004,7 @@ Responsable de :
 - historique de statut, notification, audit log ;
 - marquage paiement (`markOrderAsPaid`) ;
 - liste/detail commandes client ;
-- demande de retour client (BUG ACTIF - voir section 8.4) ;
+- demande de retour client (autorisee uniquement si statut `Delivered`) ;
 - changement de statut admin avec restitution stock si annulation et attribution fidelite si livraison.
 
 ### 10.2 `adminOrderService`
@@ -1060,7 +1082,7 @@ Tests ajoutes :
 
 ### Suite de tests actuelle
 
-21 fichiers de test :
+30 fichiers de test (`_setup-test-db.js` est un helper partagé, pas un fichier de test) :
 
 - `tests/account.test.js`
 - `tests/admin-categories.test.js`
@@ -1068,18 +1090,27 @@ Tests ajoutes :
 - `tests/admin-dashboard.test.js`
 - `tests/admin-logistics.test.js`
 - `tests/admin-logs.test.js`
+- `tests/admin-nav-ui.test.js` (navigation admin : lien actif/inactif selon `currentPath`)
 - `tests/admin-orders.test.js`
 - `tests/admin-products.test.js`
 - `tests/admin-refunds.test.js`
 - `tests/admin-reviews.test.js`
 - `tests/admin-users.test.js`
-- `tests/auth-service.test.js`
+- `tests/auth2-http.test.js` (HTTP /auth2/* : register, login, logout, forgot-password, session, RBAC, cart merge)
+- `tests/better-auth-checkout-admin.test.js` (checkout email verifie/non verifie avec BA, acces admin RBAC)
+- `tests/better-auth-mirror.test.js` (mirror auth_user -> users, audit log USER_LOGIN/LOGOUT)
+- `tests/better-auth-mount.test.js` (montage Better Auth sur /api/auth/*)
+- `tests/better-auth-service.test.js` (signUpEmail, policy, mirror, anti role injection, signInEmail, reset)
+- `tests/better-auth-session.test.js` (chargement session via cookie BA dans loadCurrentUser)
+- `tests/better-auth-ssr.test.js` (parcours SSR complet : register, login, profile, logout)
 - `tests/cart.test.js`
 - `tests/checkout.test.js`
+- `tests/csrf.test.js` (CSRF : flux GET+POST navigateur non bloque sur /auth2/login et /cart/items)
 - `tests/favorites.test.js`
 - `tests/loyalty.test.js`
 - `tests/orders.test.js`
 - `tests/payments.test.js`
+- `tests/product-detail-ui.test.js` (script inline detail produit : initialisation miniatures, fallback)
 - `tests/seo.test.js`
 - `tests/smoke.test.js`
 - `tests/tickets.test.js`
@@ -1116,7 +1147,7 @@ Peut :
 - passer commande si email verifie ;
 - payer selon les moyens disponibles ;
 - consulter ses commandes et telecharger ses factures ;
-- demander un retour (sur commande livree - BUG ACTIF inverse) ;
+- demander un retour (sur commande au statut `Delivered` uniquement) ;
 - gerer profil et adresses ;
 - gerer favoris ;
 - poster des avis ;
@@ -1164,19 +1195,27 @@ Session deconnectee automatiquement apres 30 min d'inactivite.
 9. L'admin peut suivre et changer le statut depuis `/admin/orders`.
 10. Si annulation, le stock est restitue.
 11. A la livraison (`Delivered`), les points fidelite sont attribues.
-12. Apres livraison, le client peut laisser un avis ou demander un retour (BUG ACTIF dans requestReturn).
+12. Apres livraison, le client peut laisser un avis ou demander un retour.
 13. La facture est accessible via `GET /orders/:id/invoice` (authentifie, appartenance verifiee).
 
 ---
 
 ## 14. Prochaines actions prioritaires
 
-1. **Corriger le bug `requestReturn`** : dans `src/services/orderService.js`, remplacer `if (order.status === "Delivered")` par `if (order.status !== "Delivered")`.
+1. **Nettoyage warnings `audit_logs`** dans les tests admin d'acces refuse (table absente dans certaines bases SQLite de test).
 
-2. **Nettoyage warnings `audit_logs`** dans les tests admin d'acces refuse.
+2. **`sameSite: "strict"`** non applicable actuellement a cause du retour PayPal cross-site. A reevaluer si le flux PayPal evolue vers un iframe ou capture cote serveur uniquement.
 
-3. **`sameSite: "strict"`** non applicable actuellement a cause du retour PayPal cross-site. A reevaluer si le flux PayPal evolue vers un iframe ou capture cote serveur uniquement.
+3. **CSP nonce** : supprimer `unsafe-inline` des scripts en introduisant un nonce genere par requete.
 
-4. **CSP nonce** : supprimer `unsafe-inline` des scripts en introduisant un nonce genere par requete.
+4. ~~**Refactorisation Phase 2C (suite)**~~ : **FAIT** — tests `deleteProductImage`, `addProductVariant`, `updateProductVariant`, `deleteProductVariant`, `orderDetailPage`, `updateOrder`, `orderRawPdf`, `orderShippingLabelPdf` ecrits et passes.
 
-5. **Tests plus complets sur checkout/orderService** : couvrir les edge cases coupon, doorDelivery et restitution stock.
+5. ~~**Correction du filtre date `GET /admin/orders`**~~ : **CORRIGE** — `Object.keys(range)` remplace par `Object.getOwnPropertySymbols(range)` dans `adminOrderService.js:26`, 4 tests de regression ajoutes.
+
+6. ~~**`finalPrice` non recalcule sur `updateProduct`**~~ : **CORRIGE** — recalcul explicite ajoute dans `updateProductFromAdmin` apres `Object.assign`, 2 tests de regression ajoutes.
+
+7. **Renommage `/auth2/*` -> `/auth/*`** : les URLs `/auth2/login`, `/auth2/register`, etc. sont les URLs actives mais pas celles annoncees aux utilisateurs. A faire quand les redirects 308 ne sont plus utilises par personne (requiert d'attendre que les anciens bookmarks/liens expirent).
+
+8. **Nettoyage colonnes legacy `users`** : les colonnes `password_hash`, `refresh_token_version`, `failed_login_attempts`, `locked_until`, `email_verification_token_hash`, `reset_password_token_hash`, `reset_password_expires_at` sont orphelines depuis la migration Better Auth. A supprimer via migration SQL apres backup et validation prod.
+
+9. **Variables `JWT_*` dans `.env.example`** : laissees en place apres la migration Better Auth, inoffensives mais a nettoyer dans une PR separee.

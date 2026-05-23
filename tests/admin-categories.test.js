@@ -4,17 +4,8 @@ const path = require("path");
 const os = require("os");
 const fs = require("fs");
 
-const dbPath = path.join(os.tmpdir(), `zando243-admin-categories-${process.pid}-${Date.now()}.sqlite`);
 
-process.env.NODE_ENV = "test";
-process.env.SQLITE_STORAGE = dbPath;
-process.env.CSRF_ENABLED = "false";
-process.env.DB_LOG = "false";
-process.env.JWT_ACCESS_SECRET = "test_access_secret";
-process.env.JWT_REFRESH_SECRET = "test_refresh_secret";
-process.env.COOKIE_SECRET = "test_cookie_secret";
-process.env.SESSION_SECRET = "test_session_secret";
-
+require("./_setup-test-db");
 const { sequelize, defineModels, hashPassword } = require("../src/models");
 const adminController = require("../src/controllers/adminController");
 const { requireAuth } = require("../src/middlewares/auth");
@@ -87,6 +78,21 @@ async function runHandler(handler, req, res = createRes()) {
   return { res, nextError };
 }
 
+async function runMiddlewares(middlewares, req, res = createRes()) {
+  let nextError = null;
+
+  for (const middleware of middlewares) {
+    let nextCalled = false;
+    await middleware(req, res, (err) => {
+      if (err) nextError = err;
+      nextCalled = true;
+    });
+    if (nextError || res.redirectTo || !nextCalled) break;
+  }
+
+  return { res, nextError };
+}
+
 async function seedBaseData() {
   await sequelize.sync({ force: true });
 
@@ -121,7 +127,6 @@ test.beforeEach(async () => {
 
 test.after(async () => {
   await sequelize.close();
-  if (fs.existsSync(dbPath)) fs.unlinkSync(dbPath);
 });
 
 test("un admin connecté peut afficher la page catégories et voir les catégories existantes", async () => {
@@ -187,12 +192,31 @@ test("un admin peut modifier une catégorie existante", async () => {
   assert.equal(updated.parentId, parent.id);
 });
 
+test("une catégorie sans nom est refusée proprement avec flash", async () => {
+  const req = createReq({
+    user: adminUser,
+    method: "POST",
+    body: {
+      name: "",
+      parentId: ""
+    }
+  });
+
+  const { res, nextError } = await runMiddlewares(adminController.categoryValidators, req);
+
+  assert.equal(nextError, null);
+  assert.equal(res.redirectTo, "/admin/categories");
+  assert.deepEqual(req.session.flash, { type: "error", message: "Le nom de catégorie est requis." });
+  const count = await models.Category.count();
+  assert.equal(count, 0);
+});
+
 test("un admin obtient une 404 s'il modifie une catégorie inexistante", async () => {
   const req = createReq({
     user: adminUser,
     method: "POST",
-    originalUrl: "/admin/categories/missing-id",
-    params: { id: "missing-id" },
+    originalUrl: "/admin/categories/00000000-0000-4000-8000-000000000000",
+    params: { id: "00000000-0000-4000-8000-000000000000" },
     body: {
       name: "Introuvable",
       parentId: ""

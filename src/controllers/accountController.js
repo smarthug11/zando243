@@ -4,7 +4,7 @@ const { handleValidation } = require("../middlewares/validators");
 const { setFlash } = require("../middlewares/viewLocals");
 const accountService = require("../services/accountService");
 
-const profileValidators = [body("firstName").isLength({ min: 2 }), body("lastName").isLength({ min: 2 }), body("email").isEmail(), handleValidation];
+const profileValidators = [body("firstName").isLength({ min: 2 }), body("lastName").isLength({ min: 2 }), handleValidation];
 const addressValidators = [body("label").notEmpty(), body("street").notEmpty(), body("city").notEmpty(), body("country").notEmpty(), handleValidation];
 
 const profile = asyncHandler(async (req, res) => {

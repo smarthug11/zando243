@@ -5,17 +5,8 @@ const os = require("os");
 const fs = require("fs");
 const { PassThrough } = require("stream");
 
-const dbPath = path.join(os.tmpdir(), `zando243-admin-orders-${process.pid}-${Date.now()}.sqlite`);
 
-process.env.NODE_ENV = "test";
-process.env.SQLITE_STORAGE = dbPath;
-process.env.CSRF_ENABLED = "false";
-process.env.DB_LOG = "false";
-process.env.JWT_ACCESS_SECRET = "test_access_secret";
-process.env.JWT_REFRESH_SECRET = "test_refresh_secret";
-process.env.COOKIE_SECRET = "test_cookie_secret";
-process.env.SESSION_SECRET = "test_session_secret";
-
+require("./_setup-test-db");
 const { sequelize, defineModels, hashPassword } = require("../src/models");
 const adminController = require("../src/controllers/adminController");
 const { requireAuth } = require("../src/middlewares/auth");
@@ -177,7 +168,6 @@ test.beforeEach(async () => {
 
 test.after(async () => {
   await sequelize.close();
-  if (fs.existsSync(dbPath)) fs.unlinkSync(dbPath);
 });
 
 test("un admin connecté peut afficher la liste des commandes", async () => {
@@ -270,34 +260,99 @@ test("le filtre statut respecte le statut exact demandé", async () => {
   assert.deepEqual(res.rendered.locals.filters, { q: "", status: "Shipped", startDate: "", endDate: "" });
 });
 
-test("les filtres dates sont conservés dans la vue mais ne filtrent pas actuellement", async () => {
+test("le filtre startDate+endDate retourne uniquement les commandes dans la plage", async () => {
+  // Dates à midi UTC pour être timezone-safe (éviter les ambiguïtés autour de minuit local)
   await createOrder({
     orderNumber: "ADM-BEFORE",
-    createdAt: new Date("2026-04-09T23:59:59Z"),
-    updatedAt: new Date("2026-04-09T23:59:59Z")
+    createdAt: new Date("2026-04-09T12:00:00Z"),
+    updatedAt: new Date("2026-04-09T12:00:00Z")
   });
   await createOrder({
     orderNumber: "ADM-START",
-    createdAt: new Date("2026-04-10T00:00:00Z"),
-    updatedAt: new Date("2026-04-10T00:00:00Z")
+    createdAt: new Date("2026-04-10T12:00:00Z"),
+    updatedAt: new Date("2026-04-10T12:00:00Z")
   });
   await createOrder({
     orderNumber: "ADM-END",
-    createdAt: new Date("2026-04-11T23:59:59Z"),
-    updatedAt: new Date("2026-04-11T23:59:59Z")
+    createdAt: new Date("2026-04-11T12:00:00Z"),
+    updatedAt: new Date("2026-04-11T12:00:00Z")
   });
   await createOrder({
     orderNumber: "ADM-AFTER",
-    createdAt: new Date("2026-04-12T00:00:00Z"),
-    updatedAt: new Date("2026-04-12T00:00:00Z")
+    createdAt: new Date("2026-04-13T12:00:00Z"),
+    updatedAt: new Date("2026-04-13T12:00:00Z")
   });
 
   const req = createReq({ user: adminUser, query: { startDate: "2026-04-10", endDate: "2026-04-11" } });
   const { res, nextError } = await runHandler(adminController.ordersPage, req);
 
   assert.equal(nextError, null);
-  assert.deepEqual(res.rendered.locals.orders.map((order) => order.orderNumber), ["ADM-AFTER", "ADM-END", "ADM-START", "ADM-BEFORE"]);
+  assert.deepEqual(res.rendered.locals.orders.map((order) => order.orderNumber), ["ADM-END", "ADM-START"]);
   assert.deepEqual(res.rendered.locals.filters, { q: "", status: "", startDate: "2026-04-10", endDate: "2026-04-11" });
+});
+
+test("le filtre startDate seul exclut les commandes antérieures", async () => {
+  await createOrder({
+    orderNumber: "DATE-BEFORE",
+    createdAt: new Date("2026-04-09T12:00:00Z"),
+    updatedAt: new Date("2026-04-09T12:00:00Z")
+  });
+  await createOrder({
+    orderNumber: "DATE-ON",
+    createdAt: new Date("2026-04-10T12:00:00Z"),
+    updatedAt: new Date("2026-04-10T12:00:00Z")
+  });
+  await createOrder({
+    orderNumber: "DATE-AFTER",
+    createdAt: new Date("2026-04-15T12:00:00Z"),
+    updatedAt: new Date("2026-04-15T12:00:00Z")
+  });
+
+  const req = createReq({ user: adminUser, query: { startDate: "2026-04-10" } });
+  const { res, nextError } = await runHandler(adminController.ordersPage, req);
+
+  assert.equal(nextError, null);
+  const orderNumbers = res.rendered.locals.orders.map((order) => order.orderNumber);
+  assert.ok(!orderNumbers.includes("DATE-BEFORE"));
+  assert.ok(orderNumbers.includes("DATE-ON"));
+  assert.ok(orderNumbers.includes("DATE-AFTER"));
+});
+
+test("le filtre endDate seul exclut les commandes postérieures", async () => {
+  await createOrder({
+    orderNumber: "END-BEFORE",
+    createdAt: new Date("2026-04-08T12:00:00Z"),
+    updatedAt: new Date("2026-04-08T12:00:00Z")
+  });
+  await createOrder({
+    orderNumber: "END-ON",
+    createdAt: new Date("2026-04-10T12:00:00Z"),
+    updatedAt: new Date("2026-04-10T12:00:00Z")
+  });
+  await createOrder({
+    orderNumber: "END-AFTER",
+    createdAt: new Date("2026-04-13T12:00:00Z"),
+    updatedAt: new Date("2026-04-13T12:00:00Z")
+  });
+
+  const req = createReq({ user: adminUser, query: { endDate: "2026-04-10" } });
+  const { res, nextError } = await runHandler(adminController.ordersPage, req);
+
+  assert.equal(nextError, null);
+  const orderNumbers = res.rendered.locals.orders.map((order) => order.orderNumber);
+  assert.ok(orderNumbers.includes("END-BEFORE"));
+  assert.ok(orderNumbers.includes("END-ON"));
+  assert.ok(!orderNumbers.includes("END-AFTER"));
+});
+
+test("une date invalide est ignorée selon le comportement actuel", async () => {
+  await createOrder({ orderNumber: "DATE-INVALID-001" });
+
+  const req = createReq({ user: adminUser, query: { startDate: "pas-une-date", endDate: "aussi-invalide" } });
+  const { res, nextError } = await runHandler(adminController.ordersPage, req);
+
+  assert.equal(nextError, null);
+  assert.equal(res.rendered.locals.orders.length, 1);
 });
 
 test("la limite actuelle de 100 commandes est respectée", async () => {

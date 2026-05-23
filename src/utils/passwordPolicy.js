@@ -20,6 +20,10 @@ function validatePasswordPolicy(password) {
     return "Le mot de passe doit contenir au moins 12 caractères.";
   }
 
+  if (Buffer.byteLength(value, "utf8") > 72) {
+    return "Le mot de passe ne doit pas dépasser 72 octets UTF-8 afin d'éviter la troncature bcrypt.";
+  }
+
   if (WEAK_PASSWORDS.has(normalized)) {
     return "Ce mot de passe est trop facile à deviner. Choisissez une phrase ou un mot de passe plus personnel.";
   }

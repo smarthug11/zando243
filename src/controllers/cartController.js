@@ -15,6 +15,15 @@ const cartItemValidators = [
   body("qty").optional().isInt({ min: 1, max: 99 }),
   handleValidation
 ];
+const cartItemUpdateValidators = [
+  body("qty")
+    .exists({ checkFalsy: true })
+    .withMessage("La quantité est requise.")
+    .bail()
+    .isInt({ min: 1, max: 99 })
+    .withMessage("La quantité doit être un entier entre 1 et 99."),
+  handleValidation
+];
 const checkoutValidators = [
   body("paymentMethod").isIn(["CASH_ON_DELIVERY", "CARD", "MOBILE_MONEY", "PAYPAL"]),
   body("addressId").optional({ checkFalsy: true }).isUUID(),
@@ -44,13 +53,25 @@ const showCart = asyncHandler(async (req, res) => {
   });
 });
 
+function isPayPalBackedPayment(paymentMethod) {
+  return paymentMethod === "PAYPAL" || paymentMethod === "CARD";
+}
+
+function isPayPalConfigured() {
+  return Boolean(env.paypal.clientId && env.paypal.clientSecret);
+}
+
+function safeCartRedirectTarget(value) {
+  if (typeof value !== "string") return "/products";
+  const target = value.trim();
+  if (!target.startsWith("/") || target.startsWith("//")) return "/products";
+  return target;
+}
+
 const addCartItem = asyncHandler(async (req, res) => {
   await cartService.addItem(req, req.body);
   setFlash(req, "success", "Article ajoute au panier.");
-  if (req.body.redirectTo === "cart") {
-    return res.redirect("/cart");
-  }
-  res.redirect("/products");
+  res.redirect(safeCartRedirectTarget(req.body.redirectTo));
 });
 
 const updateCartItem = asyncHandler(async (req, res) => {
@@ -68,18 +89,30 @@ const saveForLater = asyncHandler(async (req, res) => {
   res.redirect("/cart");
 });
 
+const moveSavedItemToCart = asyncHandler(async (req, res) => {
+  await cartService.moveSavedItemToCart(req, req.params.id);
+  res.redirect("/cart");
+});
+
 const checkout = asyncHandler(async (req, res) => {
   if (!req.user) {
     setFlash(req, "error", "Connectez-vous pour finaliser le paiement. Votre panier invite est conserve.");
     return res.redirect("/auth/login");
   }
+  const paypalBackedPayment = isPayPalBackedPayment(req.body.paymentMethod);
+  if (paypalBackedPayment && !isPayPalConfigured()) {
+    setFlash(req, "error", "PayPal n'est pas configure sur le serveur.");
+    return res.redirect("/cart");
+  }
   const order = await orderService.createOrderFromCart(req, {
     paymentMethod: req.body.paymentMethod,
     couponCode: req.body.couponCode,
     doorDelivery: req.body.doorDelivery === "1",
-    addressId: req.body.addressId
+    addressId: req.body.addressId,
+    clearCartItems: !paypalBackedPayment
   });
-  if (req.body.paymentMethod === "PAYPAL" || req.body.paymentMethod === "CARD") {
+  if (paypalBackedPayment) {
+    req.session.pendingPayPalCheckoutOrderId = order.id;
     return res.redirect(`/payments/paypal/start?orderId=${encodeURIComponent(order.id)}`);
   }
   setFlash(req, "success", `Commande ${order.orderNumber} creee.`);
@@ -98,6 +131,7 @@ const createCheckoutAddress = asyncHandler(async (req, res) => {
 
 module.exports = {
   cartItemValidators,
+  cartItemUpdateValidators,
   checkoutValidators,
   checkoutAddressValidators,
   showCart,
@@ -105,6 +139,7 @@ module.exports = {
   updateCartItem,
   deleteCartItem,
   saveForLater,
+  moveSavedItemToCart,
   checkout,
   createCheckoutAddress
 };

@@ -6,6 +6,20 @@ function toBool(value, fallback = false) {
 }
 
 const isProd = (process.env.NODE_ENV || "development") === "production";
+const PROD_SECRET_NAMES = new Set(["JWT_ACCESS_SECRET", "JWT_REFRESH_SECRET", "COOKIE_SECRET", "SESSION_SECRET"]);
+const FORBIDDEN_SECRET_FRAGMENTS = ["change_me", "unsafe", "secret"];
+
+function validateProductionSecret(name, value) {
+  if (!isProd || !PROD_SECRET_NAMES.has(name)) return;
+
+  const normalized = String(value).toLowerCase();
+  const forbidden = FORBIDDEN_SECRET_FRAGMENTS.find((fragment) => normalized.includes(fragment));
+  if (String(value).length < 32 || forbidden) {
+    throw new Error(
+      `Variable d'environnement ${name} invalide en production : utilisez une valeur aléatoire d'au moins 32 caractères sans placeholder.`
+    );
+  }
+}
 
 function requireSecret(name, devFallback) {
   const value = process.env[name];
@@ -13,8 +27,11 @@ function requireSecret(name, devFallback) {
     if (isProd) throw new Error(`Variable d'environnement manquante en production : ${name}`);
     return devFallback;
   }
+  validateProductionSecret(name, value);
   return value;
 }
+
+const isTest = (process.env.NODE_ENV || "development") === "test";
 
 const env = {
   nodeEnv: process.env.NODE_ENV || "development",
@@ -23,24 +40,20 @@ const env = {
   appName: process.env.APP_NAME || "Zando243",
   appUrl: process.env.APP_URL || "http://localhost:3000",
   db: {
-    dialect: isProd ? "postgres" : "sqlite",
+    dialect: "postgres",
     host: process.env.DB_HOST || "127.0.0.1",
     port: Number(process.env.DB_PORT || 5432),
-    name: process.env.DB_NAME || "zando243_db",
+    name: process.env.DB_NAME || (isTest ? "zando243_test" : "zando243_db"),
     user: process.env.DB_USER || "postgres",
     password: process.env.DB_PASSWORD || "postgres",
-    logging: toBool(process.env.DB_LOG, false),
-    sqliteStorage: process.env.SQLITE_STORAGE || "./storage/dev.sqlite"
-  },
-  jwt: {
-    accessSecret: requireSecret("JWT_ACCESS_SECRET", "dev_access_secret_UNSAFE"),
-    refreshSecret: requireSecret("JWT_REFRESH_SECRET", "dev_refresh_secret_UNSAFE"),
-    accessTtl: process.env.JWT_ACCESS_TTL || "15m",
-    refreshTtl: process.env.JWT_REFRESH_TTL || "7d"
+    logging: toBool(process.env.DB_LOG, false)
   },
   cookieSecret: requireSecret("COOKIE_SECRET", "cookie_secret_UNSAFE"),
   sessionSecret: requireSecret("SESSION_SECRET", "session_secret_UNSAFE"),
   csrfEnabled: toBool(process.env.CSRF_ENABLED, true),
+  betterAuthEnabled: toBool(process.env.BETTER_AUTH_ENABLED, true),
+  betterAuthSecret: process.env.BETTER_AUTH_SECRET || (isProd ? null : "dev_betterauth_secret_UNSAFE_changeme_xxxxxxxxxxxxxxxx"),
+  betterAuthUrl: process.env.BETTER_AUTH_URL || process.env.APP_URL || "http://localhost:3000",
   loyaltyPointsPerDollar: Number(process.env.LOYALTY_POINTS_PER_DOLLAR || 1),
   loyaltyMinOrderForPoints: Number(process.env.LOYALTY_MIN_ORDER_FOR_POINTS || 10),
   invoiceDir: path.resolve("storage/invoices"),
@@ -52,6 +65,7 @@ const env = {
     pass: process.env.SMTP_PASS || "",
     from: process.env.SMTP_FROM || "Zando243 <no-reply@zando243.local>"
   },
+  devEmailSink: process.env.DEV_EMAIL_SINK || null,
   paypal: {
     clientId: process.env.PAYPAL_CLIENT_ID || "",
     clientSecret: process.env.PAYPAL_CLIENT_SECRET || "",

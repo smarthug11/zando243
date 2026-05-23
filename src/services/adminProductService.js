@@ -2,6 +2,7 @@ const { Op } = require("sequelize");
 const { defineModels } = require("../models");
 const { toSlug } = require("../utils/slugify");
 const { escapeLike } = require("../utils/escapeLike");
+const { computeDisplayFinalPrice } = require("../utils/pricing");
 
 function parseHttpsUrl(raw) {
   if (!raw) return null;
@@ -24,7 +25,7 @@ function pickProductFields(body) {
     purchasePrice:        body.purchasePrice || 0,
     weightKg:             body.weightKg,
     stock:                body.stock,
-    status:               ["ACTIVE", "INACTIVE", "ARCHIVED"].includes(body.status) ? body.status : "ACTIVE",
+    status:               ["ACTIVE", "DRAFT", "INACTIVE", "ARCHIVED"].includes(body.status) ? body.status : "ACTIVE",
     salePrice:            body.salePrice || null,
     discountPercent:      body.discountPercent || null
   };
@@ -91,6 +92,9 @@ async function updateProductFromAdmin(productId, payload = {}) {
     slug: toSlug(payload.name || product.name),
     keywords: (payload.keywords || "").split(",").map((s) => s.trim()).filter(Boolean)
   });
+  if (product.priceWithoutDelivery != null && product.weightKg != null) {
+    product.finalPrice = computeDisplayFinalPrice(product);
+  }
   await product.save();
   return product;
 }

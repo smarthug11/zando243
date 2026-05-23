@@ -2,16 +2,17 @@
 <%- include('../../partials/navbar') %>
 <%- include('../../partials/flash') %>
 <main class="container-max mx-auto px-4 py-6 space-y-8">
-  <% const allImages = (product.images||[]); const mainImg=(allImages.find(i=>i.isMain)||allImages[0]); %>
+  <% const allImages = (product.images||[]); const mainImg=(allImages.find(i=>i.isMain)||allImages[0]); const mainImageId = mainImg?.id; %>
   <section class="grid lg:grid-cols-2 gap-6">
     <div class="card p-3">
       <img id="productMainImage" class="w-full aspect-[4/3] object-cover rounded-xl bg-slate-100" src="<%= mainImg?.url || 'https://via.placeholder.com/900x700' %>" alt="">
       <div id="productThumbs" class="grid grid-cols-4 gap-2 mt-3">
-        <% allImages.forEach((img, idx)=> { %>
+        <% allImages.forEach((img, idx)=> { const isMainThumb = mainImageId ? String(img.id) === String(mainImageId) : idx === 0; %>
           <button
             type="button"
-            class="thumb-btn aspect-square rounded-lg overflow-hidden border <%= idx===0 ? 'border-blue-500' : 'border-slate-200' %>"
+            class="thumb-btn aspect-square rounded-lg overflow-hidden border <%= isMainThumb ? 'border-blue-500' : 'border-slate-200' %>"
             data-image-url="<%= img.url %>"
+            data-main="<%= isMainThumb ? 'true' : 'false' %>"
             data-variant-id="<%= img.variantId || '' %>">
             <img class="w-full h-full object-cover bg-slate-100" src="<%= img.url %>" alt="">
           </button>
@@ -53,6 +54,7 @@
           <input type="hidden" name="_csrf" value="<%= csrfToken %>">
           <input type="hidden" name="productId" value="<%= product.id %>">
           <input type="hidden" id="selectedVariantIdInput" name="variantId" value="">
+          <input type="hidden" name="redirectTo" value="<%= currentUrl %>">
           <input class="form-input w-24" type="number" name="qty" min="1" value="1">
           <button class="btn-primary" type="submit">Ajouter au panier</button>
         </form>
@@ -88,7 +90,7 @@
       <% } else { %>
         <div class="border rounded-xl p-4 mb-4 text-sm text-slate-600">
           Connectez-vous pour laisser un avis et une note.
-          <a href="/auth/login" class="text-blue-700 font-semibold">Se connecter</a>
+          <a href="/auth2/login" class="text-blue-700 font-semibold">Se connecter</a>
         </div>
       <% } %>
       <div class="space-y-3">
@@ -164,13 +166,13 @@
       thumbs.forEach(t => {
         t.style.display = visible.includes(t) ? '' : 'none';
       });
-      setActiveThumb(visible[0] || thumbs[0] || null);
+      setActiveThumb(visible.find(t => t.dataset.main === 'true') || visible[0] || thumbs[0] || null);
     }
 
     thumbs.forEach(btn => btn.addEventListener('click', () => setActiveThumb(btn)));
     chips.forEach(chip => chip.addEventListener('click', () => applyVariantFilter(chip.dataset.variantId || '')));
     if (chips.length) applyVariantFilter('');
-    else if (thumbs.length) setActiveThumb(thumbs[0]);
+    else if (thumbs.length) setActiveThumb(thumbs.find(t => t.dataset.main === 'true') || thumbs[0]);
   })();
 </script>
 <%- include('../../partials/footer') %>

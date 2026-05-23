@@ -24,13 +24,13 @@
         <a class="btn-secondary" href="/favorites">Favoris</a>
         <a class="btn-secondary" href="/account/profile">Compte</a>
         <% if (_auth.user.role === 'ADMIN') { %><a class="btn-primary" href="/admin">Admin</a><% } %>
-        <form action="/auth/logout" method="POST" class="inline">
+        <form action="/auth2/logout" method="POST" class="inline">
           <input type="hidden" name="_csrf" value="<%= _csrf %>">
           <button class="btn-secondary" type="submit">Logout</button>
         </form>
       <% } else { %>
-        <a class="btn-secondary" href="/auth/login">Connexion</a>
-        <a class="btn-primary" href="/auth/register">Inscription</a>
+        <a class="btn-secondary" href="/auth2/login">Connexion</a>
+        <a class="btn-primary" href="/auth2/register">Inscription</a>
       <% } %>
     </nav>
     <div class="md:hidden flex items-center gap-2">
@@ -62,13 +62,13 @@
         <a class="btn-secondary text-center" href="/orders">Commandes</a>
         <a class="btn-secondary text-center" href="/tickets">Support</a>
         <% if (_auth.user.role === 'ADMIN') { %><a class="btn-primary text-center" href="/admin">Admin</a><% } %>
-        <form action="/auth/logout" method="POST">
+        <form action="/auth2/logout" method="POST">
           <input type="hidden" name="_csrf" value="<%= _csrf %>">
           <button class="btn-secondary w-full" type="submit">Logout</button>
         </form>
       <% } else { %>
-        <a class="btn-secondary text-center" href="/auth/login">Connexion</a>
-        <a class="btn-primary text-center" href="/auth/register">Inscription</a>
+        <a class="btn-secondary text-center" href="/auth2/login">Connexion</a>
+        <a class="btn-primary text-center" href="/auth2/register">Inscription</a>
       <% } %>
     </div>
   </div>

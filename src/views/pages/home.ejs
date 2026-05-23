@@ -48,6 +48,7 @@
                 <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                 <input type="hidden" name="productId" value="<%= product.id %>">
                 <input type="hidden" name="qty" value="1">
+                <input type="hidden" name="redirectTo" value="<%= currentUrl %>">
                 <button class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700" type="submit">
                   Ajouter
                 </button>
@@ -56,7 +57,7 @@
                 <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                 <input type="hidden" name="productId" value="<%= product.id %>">
                 <input type="hidden" name="qty" value="1">
-                <input type="hidden" name="redirectTo" value="cart">
+                <input type="hidden" name="redirectTo" value="/cart">
                 <button
                   class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-white transition hover:bg-blue-700"
                   type="submit"

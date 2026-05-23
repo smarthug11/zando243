@@ -1,10 +1,30 @@
-const { body } = require("express-validator");
+const { body, validationResult } = require("express-validator");
 const { asyncHandler } = require("../../utils/asyncHandler");
 const adminCouponService = require("../../services/adminCouponService");
 const { createAuditLog } = require("../../services/auditLogService");
-const { handleValidation } = require("../../middlewares/validators");
+const { setFlash } = require("../../middlewares/viewLocals");
 
-const couponValidators = [body("code").notEmpty(), body("type").isIn(["PERCENT", "FIXED"]), body("value").isFloat({ min: 0 }), handleValidation];
+function handleCouponValidation(req, res, next) {
+  const errors = validationResult(req);
+  if (errors.isEmpty()) return next();
+
+  const firstMessage = errors.array().find((error) => typeof error.msg === "string" && error.msg)?.msg;
+  setFlash(req, "error", firstMessage || "Coupon invalide.");
+  return res.redirect("/admin/coupons");
+}
+
+const couponValidators = [
+  body("code").trim().notEmpty().withMessage("Le code du coupon est requis."),
+  body("type").isIn(["PERCENT", "FIXED"]).withMessage("Le type de coupon est invalide."),
+  body("value").isFloat({ min: 0 }).withMessage("La valeur du coupon est requise."),
+  body("minCart").optional({ values: "falsy" }).isFloat({ min: 0 }).withMessage("Le minimum panier est invalide."),
+  body("maxDiscount").optional({ values: "falsy" }).isFloat({ min: 0 }).withMessage("Le plafond de remise est invalide."),
+  body("usageLimit").optional({ values: "falsy" }).isInt({ min: 1 }).withMessage("La limite d'usage est invalide."),
+  body("usagePerUser").optional({ values: "falsy" }).isInt({ min: 1 }).withMessage("La limite par utilisateur est invalide."),
+  body("startAt").notEmpty().withMessage("La date de début est requise.").bail().isISO8601().withMessage("La date de début est invalide."),
+  body("endAt").notEmpty().withMessage("La date de fin est requise.").bail().isISO8601().withMessage("La date de fin est invalide."),
+  handleCouponValidation
+];
 
 const couponsPage = asyncHandler(async (_req, res) => {
   const coupons = await adminCouponService.listCoupons();

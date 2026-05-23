@@ -3,7 +3,7 @@ const { setFlash } = require("../middlewares/viewLocals");
 const { defineModels } = require("../models");
 const { env } = require("../config/env");
 const { createCheckoutOrder, captureCheckoutOrder, verifyWebhookSignature } = require("../services/paypalService");
-const { createOrderFromCart, markOrderAsPaid } = require("../services/orderService");
+const { createOrderFromCart, clearActiveCartItemsForUser, markOrderAsPaid } = require("../services/orderService");
 const { createAuditLog } = require("../services/auditLogService");
 
 defineModels();
@@ -30,12 +30,24 @@ const startPayPal = asyncHandler(async (req, res) => {
 
   const returnUrl = `${env.appUrl}/payments/paypal/return`;
   const cancelUrl = `${env.appUrl}/orders/${order.id}`;
-  const { paypalOrderId, approveUrl } = await createCheckoutOrder({ localOrder: order, returnUrl, cancelUrl });
+  let paypalOrderId;
+  let approveUrl;
+  try {
+    ({ paypalOrderId, approveUrl } = await createCheckoutOrder({ localOrder: order, returnUrl, cancelUrl }));
+  } catch (_err) {
+    setFlash(req, "error", "Impossible d'initialiser le paiement PayPal. Votre panier est conserve.");
+    return res.redirect("/cart");
+  }
 
   await order.update({
     paymentProvider: "PAYPAL",
     paymentReference: paypalOrderId
   });
+
+  if (req.session?.pendingPayPalCheckoutOrderId === order.id) {
+    await clearActiveCartItemsForUser(req.user.id);
+    delete req.session.pendingPayPalCheckoutOrderId;
+  }
 
   await createAuditLog({
     category: "PAYMENT",
@@ -132,6 +144,7 @@ const createPayPalOrderForSdk = asyncHandler(async (req, res) => {
 
   let order = null;
   const { localOrderId } = req.body || {};
+  let createdFromCart = false;
   if (localOrderId) {
     order = await models.Order.findOne({ where: { id: localOrderId, userId: req.user.id } });
   }
@@ -141,8 +154,10 @@ const createPayPalOrderForSdk = asyncHandler(async (req, res) => {
       paymentMethod: req.body?.paymentMethod === "CARD" ? "CARD" : "PAYPAL",
       couponCode: req.body?.couponCode || null,
       doorDelivery: req.body?.doorDelivery === true || req.body?.doorDelivery === "1",
-      addressId: req.body?.addressId || null
+      addressId: req.body?.addressId || null,
+      clearCartItems: false
     });
+    createdFromCart = true;
   }
 
   if (order.paymentStatus === "PAID") {
@@ -157,6 +172,10 @@ const createPayPalOrderForSdk = asyncHandler(async (req, res) => {
       paymentProvider: "PAYPAL",
       paymentReference: paypalOrderId
     });
+  }
+
+  if (createdFromCart) {
+    await clearActiveCartItemsForUser(req.user.id);
   }
 
   return res.json({

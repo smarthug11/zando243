@@ -28,7 +28,7 @@ function defineModels() {
       avatarUrl: { type: DataTypes.STRING },
       loyaltyPoints: { type: DataTypes.INTEGER, defaultValue: 0 },
       isActive: { type: DataTypes.BOOLEAN, defaultValue: true },
-      passwordHash: { type: DataTypes.STRING, allowNull: false },
+      passwordHash: { type: DataTypes.STRING, allowNull: true },
       emailVerifiedAt: { type: DataTypes.DATE },
       emailVerificationTokenHash: { type: DataTypes.STRING },
       resetPasswordTokenHash: { type: DataTypes.STRING },

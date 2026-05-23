@@ -58,12 +58,12 @@ async function listAuditLogs(filters = {}) {
   const where = {};
   if (filters.category) where.category = normalize(filters.category);
   if (filters.level) where.level = normalize(filters.level);
-  if (filters.actorEmail) where.actorEmail = { [Op.like]: `%${escapeLike(filters.actorEmail)}%` };
+  if (filters.actorEmail) where.actorEmail = { [Op.iLike]: `%${escapeLike(filters.actorEmail)}%` };
   if (filters.q) {
     const q = escapeLike(filters.q);
     where[Op.or] = [
-      { message: { [Op.like]: `%${q}%` } },
-      { action: { [Op.like]: `%${q}%` } }
+      { message: { [Op.iLike]: `%${q}%` } },
+      { action: { [Op.iLike]: `%${q}%` } }
     ];
   }
   const startDate = parseDate(filters.startDate, false);

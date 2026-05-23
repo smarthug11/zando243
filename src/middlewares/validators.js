@@ -1,9 +1,13 @@
 const { validationResult } = require("express-validator");
+const sanitizeHtml = require("sanitize-html");
 const { AppError } = require("../utils/AppError");
 
 function sanitizeValue(value) {
   if (typeof value !== "string") return value;
-  return value.replace(/[<>]/g, "").trim();
+  return sanitizeHtml(value, {
+    allowedTags: [],
+    allowedAttributes: {}
+  }).trim();
 }
 
 function deepSanitize(obj) {

@@ -63,7 +63,7 @@ async function listProducts(query = {}) {
 async function getProductBySlug(slug) {
   const models = defineModels();
   return models.Product.findOne({
-    where: { slug },
+    where: { slug, status: "ACTIVE" },
     include: [
       { model: models.ProductImage, as: "images", include: [{ model: models.ProductVariant, as: "variant", required: false }], required: false },
       { model: models.ProductVariant, as: "variants", required: false },

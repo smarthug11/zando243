@@ -1,9 +1,22 @@
-const { body } = require("express-validator");
+const { body, validationResult } = require("express-validator");
 const { asyncHandler } = require("../../utils/asyncHandler");
 const adminCategoryService = require("../../services/adminCategoryService");
-const { handleValidation } = require("../../middlewares/validators");
+const { setFlash } = require("../../middlewares/viewLocals");
 
-const categoryValidators = [body("name").notEmpty(), handleValidation];
+function handleCategoryValidation(req, res, next) {
+  const errors = validationResult(req);
+  if (errors.isEmpty()) return next();
+
+  const firstMessage = errors.array().find((error) => typeof error.msg === "string" && error.msg)?.msg;
+  setFlash(req, "error", firstMessage || "Catégorie invalide.");
+  return res.redirect("/admin/categories");
+}
+
+const categoryValidators = [
+  body("name").trim().notEmpty().withMessage("Le nom de catégorie est requis."),
+  body("parentId").optional({ values: "falsy" }).isUUID().withMessage("Le parent sélectionné est invalide."),
+  handleCategoryValidation
+];
 
 const categoriesPage = asyncHandler(async (_req, res) => {
   const categories = await adminCategoryService.listCategories();

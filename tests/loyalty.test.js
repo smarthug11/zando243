@@ -3,17 +3,8 @@ const assert = require("node:assert/strict");
 const path = require("path");
 const os = require("os");
 
-const dbPath = path.join(os.tmpdir(), `zando243-loyalty-${process.pid}-${Date.now()}.sqlite`);
 
-process.env.NODE_ENV = "test";
-process.env.SQLITE_STORAGE = dbPath;
-process.env.CSRF_ENABLED = "false";
-process.env.DB_LOG = "false";
-process.env.JWT_ACCESS_SECRET = "test_access_secret";
-process.env.JWT_REFRESH_SECRET = "test_refresh_secret";
-process.env.COOKIE_SECRET = "test_cookie_secret";
-process.env.SESSION_SECRET = "test_session_secret";
-
+require("./_setup-test-db");
 const { sequelize, defineModels, hashPassword } = require("../src/models");
 const orderService = require("../src/services/orderService");
 const accountService = require("../src/services/accountService");

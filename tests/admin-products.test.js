@@ -4,19 +4,12 @@ const path = require("path");
 const os = require("os");
 const fs = require("fs");
 
-const dbPath = path.join(os.tmpdir(), `zando243-admin-products-${process.pid}-${Date.now()}.sqlite`);
 
-process.env.NODE_ENV = "test";
-process.env.SQLITE_STORAGE = dbPath;
-process.env.CSRF_ENABLED = "false";
-process.env.DB_LOG = "false";
-process.env.JWT_ACCESS_SECRET = "test_access_secret";
-process.env.JWT_REFRESH_SECRET = "test_refresh_secret";
-process.env.COOKIE_SECRET = "test_cookie_secret";
-process.env.SESSION_SECRET = "test_session_secret";
-
+require("./_setup-test-db");
 const { sequelize, defineModels, hashPassword } = require("../src/models");
 const adminController = require("../src/controllers/adminController");
+const catalogService = require("../src/services/catalogService");
+const cartService = require("../src/services/cartService");
 const { requireAuth } = require("../src/middlewares/auth");
 const { requireRole } = require("../src/middlewares/roles");
 const { errorHandler } = require("../src/middlewares/errorHandler");
@@ -198,7 +191,6 @@ test.beforeEach(async () => {
 
 test.after(async () => {
   await sequelize.close();
-  if (fs.existsSync(dbPath)) fs.unlinkSync(dbPath);
 });
 
 test("un admin connecté peut afficher la liste admin des produits", async () => {
@@ -342,6 +334,29 @@ test("le paramètre status est ignoré selon le comportement actuel", async () =
   assert.deepEqual(res.rendered.locals.filters, { q: "", categoryId: "", stockLte: "" });
 });
 
+test("un produit DRAFT est absent du catalogue public et de la fiche publique", async () => {
+  const active = await createProduct({ name: "Catalogue Active", slug: "catalogue-active", sku: "CAT-ACTIVE", status: "ACTIVE" });
+  const draft = await createProduct({ name: "Catalogue Draft", slug: "catalogue-draft", sku: "CAT-DRAFT", status: "DRAFT" });
+
+  const { products } = await catalogService.listProducts({ q: "Catalogue" });
+  const publicDetail = await catalogService.getProductBySlug(draft.slug);
+
+  assert.ok(products.some((product) => product.id === active.id));
+  assert.ok(!products.some((product) => product.id === draft.id));
+  assert.equal(publicDetail, null);
+});
+
+test("un produit DRAFT n'est pas commandable", async () => {
+  const draft = await createProduct({ name: "Draft Panier", sku: "DRAFT-CART", status: "DRAFT" });
+  const req = createReq({ user: customerUser, session: {} });
+
+  await assert.rejects(
+    () => cartService.addItem(req, { productId: draft.id, qty: 1 }),
+    (error) => error.code === "PRODUCT_NOT_FOUND"
+  );
+  assert.equal(await models.CartItem.count(), 0);
+});
+
 test("la limite actuelle de 200 produits est respectée", async () => {
   for (let i = 0; i < 205; i += 1) {
     await createProduct({
@@ -389,6 +404,26 @@ test("un admin peut créer un produit avec les champs requis", async () => {
   assert.equal(Number(product.weightKg), 1);
   assert.equal(product.stock, 8);
   assert.equal(product.status, "ACTIVE");
+});
+
+test("un admin peut créer un produit DRAFT", async () => {
+  const req = createReq({
+    user: adminUser,
+    method: "POST",
+    body: productCreateBody({
+      name: "Draft Admin",
+      sku: "CREATE-DRAFT-001",
+      status: "DRAFT"
+    })
+  });
+
+  const { res, nextError } = await runHandler(adminController.createProduct, req);
+  const product = await models.Product.findOne({ where: { sku: "CREATE-DRAFT-001" } });
+
+  assert.equal(nextError, null);
+  assert.equal(res.redirectTo, "/admin/products");
+  assert.ok(product);
+  assert.equal(product.status, "DRAFT");
 });
 
 test("la création génère le slug et transforme les keywords selon le comportement actuel", async () => {
@@ -583,6 +618,32 @@ test("un admin peut modifier un produit existant avec les champs autorisés", as
   assert.equal(product.status, "INACTIVE");
 });
 
+test("un admin peut modifier un produit en DRAFT", async () => {
+  const product = await createProduct({
+    name: "Produit Draftable",
+    sku: "UPDATE-DRAFT-OLD",
+    status: "ACTIVE",
+    categoryId: categoryA.id
+  });
+  const req = createReq({
+    user: adminUser,
+    method: "POST",
+    params: { id: product.id },
+    body: productUpdateBody({
+      name: "Produit Draft",
+      sku: "UPDATE-DRAFT-NEW",
+      status: "DRAFT"
+    })
+  });
+
+  const { res, nextError } = await runHandler(adminController.updateProduct, req);
+  await product.reload();
+
+  assert.equal(nextError, null);
+  assert.equal(res.redirectTo, "/admin/products");
+  assert.equal(product.status, "DRAFT");
+});
+
 test("la modification régénère le slug quand le nom change", async () => {
   const product = await createProduct({
     name: "Ancien Nom",
@@ -728,7 +789,8 @@ test("les champs non autorisés ne sont pas injectés lors de la modification", 
 
   assert.equal(nextError, null);
   assert.equal(product.id, originalId);
-  assert.equal(Number(product.finalPrice), 65);
+  // finalPrice est recalculé depuis priceWithoutDelivery=80, weightKg=2 → 80+30=110 (injection 9999 ignorée)
+  assert.equal(Number(product.finalPrice), 110);
   assert.equal(Number(product.avgRating), 2);
   assert.equal(product.countReviews, 3);
   assert.equal(product.popularityScore, 4);
@@ -1468,6 +1530,52 @@ test("un visiteur non connecté est bloqué sur la modification d'image selon le
   assert.equal(res.statusCode, 401);
   assert.equal(res.rendered.view, "pages/errors/error");
   assert.match(res.rendered.locals.error.message, /Authentification requise/);
+});
+
+test("updateProduct recalcule finalPrice quand priceWithoutDelivery change", async () => {
+  const product = await createProduct({
+    name: "Produit FinalPrice",
+    sku: "FINALPRICE-001",
+    priceWithoutDelivery: 10,
+    weightKg: 1
+  });
+  assert.equal(Number(product.finalPrice), 25);
+
+  const req = createReq({
+    user: adminUser,
+    method: "POST",
+    params: { id: product.id },
+    body: productUpdateBody({ name: "Produit FinalPrice", sku: "FINALPRICE-001", priceWithoutDelivery: "20", weightKg: "1" })
+  });
+
+  const { nextError } = await runHandler(adminController.updateProduct, req);
+  await product.reload();
+
+  assert.equal(nextError, null);
+  assert.equal(Number(product.finalPrice), 35);
+});
+
+test("updateProduct recalcule finalPrice quand weightKg change", async () => {
+  const product = await createProduct({
+    name: "Produit FinalPrice Weight",
+    sku: "FINALPRICE-W-001",
+    priceWithoutDelivery: 10,
+    weightKg: 1
+  });
+  assert.equal(Number(product.finalPrice), 25);
+
+  const req = createReq({
+    user: adminUser,
+    method: "POST",
+    params: { id: product.id },
+    body: productUpdateBody({ name: "Produit FinalPrice Weight", sku: "FINALPRICE-W-001", priceWithoutDelivery: "10", weightKg: "2" })
+  });
+
+  const { nextError } = await runHandler(adminController.updateProduct, req);
+  await product.reload();
+
+  assert.equal(nextError, null);
+  assert.equal(Number(product.finalPrice), 40);
 });
 
 // ============================================================

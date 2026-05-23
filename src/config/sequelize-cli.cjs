@@ -1,20 +1,15 @@
 require("dotenv").config();
 
+const baseConfig = {
+  username: process.env.DB_USER || "postgres",
+  password: process.env.DB_PASSWORD || "postgres",
+  host: process.env.DB_HOST || "127.0.0.1",
+  port: Number(process.env.DB_PORT || 5432),
+  dialect: "postgres"
+};
+
 module.exports = {
-  development: {
-    dialect: "sqlite",
-    storage: process.env.SQLITE_STORAGE || "./storage/dev.sqlite"
-  },
-  test: {
-    dialect: "sqlite",
-    storage: process.env.SQLITE_STORAGE_TEST || "./storage/test.sqlite"
-  },
-  production: {
-    username: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME,
-    host: process.env.DB_HOST,
-    port: Number(process.env.DB_PORT || 5432),
-    dialect: "postgres"
-  }
+  development: { ...baseConfig, database: process.env.DB_NAME || "zando243_db" },
+  test:        { ...baseConfig, database: process.env.DB_NAME || "zando243_test" },
+  production:  { ...baseConfig, database: process.env.DB_NAME }
 };

@@ -54,6 +54,7 @@
                 <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                 <input type="hidden" name="productId" value="<%= product.id %>">
                 <input type="hidden" name="qty" value="1">
+                <input type="hidden" name="redirectTo" value="<%= currentUrl %>">
                 <button class="btn-primary text-sm" type="submit">Ajouter</button>
               </form>
             </div>

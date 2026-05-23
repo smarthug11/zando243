@@ -1,5 +1,5 @@
 ﻿"use strict";
-const bcrypt = require("bcrypt");
+require("dotenv").config();
 const { randomUUID } = require("crypto");
 
 const img = [
@@ -19,58 +19,96 @@ const line = (p, w, q=1) => +((p + 15 * w) * q).toFixed(2);
 module.exports = {
   async up(queryInterface) {
     const dialect = queryInterface.sequelize.getDialect();
+    const asJsonb = (value) => JSON.stringify(value);
     const asJson = (value) => (dialect === "sqlite" ? JSON.stringify(value) : value);
+    // Tables Better Auth (créées par migration 202605160002) — purgées avant le seed
+    const baTables = ["auth_session", "auth_verification", "auth_account", "auth_user"];
     const cleanupTables = [
       "recently_viewed","support_messages","support_tickets","reviews","notifications","return_requests",
       "coupon_redemptions","order_status_histories","order_items","orders","favorites","cart_items","carts",
-      "addresses","product_variants","product_images","products","categories","coupons","users"
+      "addresses","product_variants","product_images","products","categories","coupons",
+      ...baTables,
+      "users"
     ];
     if (dialect === "sqlite") {
       await queryInterface.sequelize.query("PRAGMA foreign_keys = OFF;");
     }
     for (const t of cleanupTables) {
-      await queryInterface.bulkDelete(t, null, {});
+      try { await queryInterface.bulkDelete(t, null, {}); } catch (_e) { /* table peut ne pas exister */ }
     }
     if (dialect === "sqlite") {
       await queryInterface.sequelize.query("PRAGMA foreign_keys = ON;");
     }
 
-    const password = await bcrypt.hash("Password123!", 10);
-    const adminIds = [randomUUID(), randomUUID()];
-    const userIds = Array.from({ length: 10 }, () => randomUUID());
-    const allUsers = [...adminIds, ...userIds];
-    const userFields = [
-      "id","role","first_name","last_name","email","phone","avatar_url","loyalty_points","is_active",
-      "password_hash","email_verified_at","email_verification_token_hash","reset_password_token_hash",
-      "reset_password_expires_at","refresh_token_version","created_at","updated_at","deleted_at"
-    ];
-    const mkUser = (row) => ({
-      id: row.id,
-      role: row.role,
-      first_name: row.first_name,
-      last_name: row.last_name,
-      email: row.email,
-      phone: row.phone ?? null,
-      avatar_url: row.avatar_url ?? null,
-      loyalty_points: row.loyalty_points ?? 0,
-      is_active: row.is_active ?? true,
-      password_hash: row.password_hash,
-      email_verified_at: row.email_verified_at ?? null,
-      email_verification_token_hash: row.email_verification_token_hash ?? null,
-      reset_password_token_hash: row.reset_password_token_hash ?? null,
-      reset_password_expires_at: row.reset_password_expires_at ?? null,
-      refresh_token_version: row.refresh_token_version ?? 0,
-      created_at: row.created_at ?? now(),
-      updated_at: row.updated_at ?? now(),
-      deleted_at: null
-    });
+    // ------------------------------------------------------------------
+    // USERS — créés via l'API Better Auth (sign-up) puis enrichis ensuite
+    // ------------------------------------------------------------------
+    const { getBetterAuthModule } = require("../utils/betterAuthBridge");
+    const baMod = await getBetterAuthModule();
+    const auth = baMod.getAuth();
 
-    const userRows = [
-      mkUser({ id: adminIds[0], role: "ADMIN", first_name: "Admin", last_name: "One", email: "admin1@zando243.local", phone: "+243810000001", avatar_url: "https://i.pravatar.cc/150?img=10", loyalty_points: 0, is_active: true, password_hash: password, email_verified_at: now(), refresh_token_version: 0, created_at: now(), updated_at: now() }),
-      mkUser({ id: adminIds[1], role: "ADMIN", first_name: "Admin", last_name: "Two", email: "admin2@zando243.local", phone: "+243810000002", avatar_url: "https://i.pravatar.cc/150?img=11", loyalty_points: 0, is_active: true, password_hash: password, email_verified_at: now(), refresh_token_version: 0, created_at: now(), updated_at: now() }),
-      ...userIds.map((id, i) => mkUser({ id, role: "CUSTOMER", first_name: `Client${i+1}`, last_name: "Zando", email: `user${i+1}@zando243.local`, phone: `+24382${String(1000000+i).slice(-7)}`, avatar_url: `https://i.pravatar.cc/150?img=${20+i}`, loyalty_points: (i+1)*15, is_active: true, password_hash: password, email_verified_at: i < 8 ? now() : null, refresh_token_version: 0, created_at: daysAgo(40-i), updated_at: now() }))
+    async function createBaUser({ email, password, firstName, lastName, phone }) {
+      const res = await auth.api.signUpEmail({
+        body: { email, password, name: `${firstName} ${lastName}`, firstName, lastName, phone }
+      });
+      return res.user.id;
+    }
+
+    const adminSpecs = [
+      { email: "admin1@zando243.local", firstName: "Admin", lastName: "One", phone: "+243810000001", avatarUrl: "https://i.pravatar.cc/150?img=10" },
+      { email: "admin2@zando243.local", firstName: "Admin", lastName: "Two", phone: "+243810000002", avatarUrl: "https://i.pravatar.cc/150?img=11" }
     ];
-    await queryInterface.bulkInsert("users", userRows, { fields: userFields });
+    const customerSpecs = Array.from({ length: 10 }, (_, i) => ({
+      email: `user${i+1}@zando243.local`,
+      firstName: `Client${i+1}`,
+      lastName: "Zando",
+      phone: `+24382${String(1000000+i).slice(-7)}`,
+      avatarUrl: `https://i.pravatar.cc/150?img=${20+i}`,
+      loyaltyPoints: (i+1)*15,
+      verified: i < 8,
+      createdAt: daysAgo(40-i)
+    }));
+
+    const PASSWORD = "Password123!";
+    const adminIds = [];
+    for (const spec of adminSpecs) {
+      const id = await createBaUser({ ...spec, password: PASSWORD });
+      adminIds.push(id);
+    }
+    const userIds = [];
+    for (const spec of customerSpecs) {
+      const id = await createBaUser({ ...spec, password: PASSWORD });
+      userIds.push(id);
+    }
+    const allUsers = [...adminIds, ...userIds];
+
+    // Enrichir les rôles ADMIN + champs métier non gérés par BA (loyalty, avatar, verified)
+    for (let i = 0; i < adminIds.length; i++) {
+      await queryInterface.bulkUpdate(
+        "auth_user",
+        { role: "ADMIN" },
+        { id: adminIds[i] }
+      );
+      await queryInterface.bulkUpdate(
+        "users",
+        { role: "ADMIN", phone: adminSpecs[i].phone, avatar_url: adminSpecs[i].avatarUrl, email_verified_at: now() },
+        { id: adminIds[i] }
+      );
+    }
+    for (let i = 0; i < userIds.length; i++) {
+      const spec = customerSpecs[i];
+      await queryInterface.bulkUpdate(
+        "users",
+        {
+          phone: spec.phone,
+          avatar_url: spec.avatarUrl,
+          loyalty_points: spec.loyaltyPoints,
+          email_verified_at: spec.verified ? now() : null,
+          created_at: spec.createdAt
+        },
+        { id: userIds[i] }
+      );
+    }
 
     const cat = { e: randomUUID(), f: randomUUID(), h: randomUUID(), b: randomUUID(), p: randomUUID(), a: randomUUID(), mh: randomUUID(), mf: randomUUID() };
     await queryInterface.bulkInsert("categories", [
@@ -147,8 +185,8 @@ module.exports = {
       const discount = i % 3 === 0 ? 5 : 0;
       const status = i < 4 ? "Delivered" : (i % 2 ? "Shipped" : "Processing");
       const ad = addresses.find(a => a.user_id === uid);
-      orders.push({ id: oid, order_number: `ORD-2026-${10000+i}`, user_id: uid, address_snapshot: asJson({ label: ad.label, street: ad.street, city: ad.city, country: ad.country }), subtotal, shipping_fee: shipping, discount_total: discount, total: +(subtotal + shipping - discount).toFixed(2), coupon_code: discount ? "FIXED5" : null, payment_method: ["CASH_ON_DELIVERY","CARD","MOBILE_MONEY"][i%3], status, tracking_number: `TRK${20000+i}`, tracking_carrier: "Zando Logistics", customs_fee: i % 2 ? 2.5 : 0, consolidation_reference: `CONSOL-${i+1}`, logistics_meta: asJson({ warehouse: "Kinshasa Hub" }), internal_note: i % 2 ? "Appeler avant livraison" : null, created_at: daysAgo(20-i), updated_at: daysAgo(1) });
-      picks.forEach((p) => orderItems.push({ id: randomUUID(), order_id: oid, product_id: p.id, product_snapshot: asJson({ name: p.name, sku: p.sku, weightKg: +p.weight_kg, priceWithoutDelivery: +p.price_without_delivery }), unit_price: +p.price_without_delivery, qty: 1, line_total: line(+p.price_without_delivery, +p.weight_kg, 1), created_at: daysAgo(20-i), updated_at: daysAgo(20-i) }));
+      orders.push({ id: oid, order_number: `ORD-2026-${10000+i}`, user_id: uid, address_snapshot: asJsonb({ label: ad.label, street: ad.street, city: ad.city, country: ad.country }), subtotal, shipping_fee: shipping, discount_total: discount, total: +(subtotal + shipping - discount).toFixed(2), coupon_code: discount ? "FIXED5" : null, payment_method: ["CASH_ON_DELIVERY","CARD","MOBILE_MONEY"][i%3], status, tracking_number: `TRK${20000+i}`, tracking_carrier: "Zando Logistics", customs_fee: i % 2 ? 2.5 : 0, consolidation_reference: `CONSOL-${i+1}`, logistics_meta: asJsonb({ warehouse: "Kinshasa Hub" }), internal_note: i % 2 ? "Appeler avant livraison" : null, created_at: daysAgo(20-i), updated_at: daysAgo(1) });
+      picks.forEach((p) => orderItems.push({ id: randomUUID(), order_id: oid, product_id: p.id, product_snapshot: asJsonb({ name: p.name, sku: p.sku, weightKg: +p.weight_kg, priceWithoutDelivery: +p.price_without_delivery }), unit_price: +p.price_without_delivery, qty: 1, line_total: line(+p.price_without_delivery, +p.weight_kg, 1), created_at: daysAgo(20-i), updated_at: daysAgo(20-i) }));
       ["Processing", i > 0 ? "Shipped" : "Processing", status].forEach((st, k) => history.push({ id: randomUUID(), order_id: oid, status: st, note: ["Commande créée","Transit logistique","Statut final"][k], created_at: daysAgo(20-i-k), updated_at: daysAgo(20-i-k) }));
       if (discount) redemptions.push({ id: randomUUID(), coupon_id: couponIds.f, user_id: uid, order_id: oid, created_at: daysAgo(20-i), updated_at: daysAgo(20-i) });
       if (status !== "Delivered") returns.push({ id: randomUUID(), order_id: oid, reason: "Annulation demandée avant livraison", status: i % 2 ? "Requested" : "Approved", created_at: daysAgo(3), updated_at: daysAgo(2) });
@@ -187,8 +225,8 @@ module.exports = {
   },
 
   async down(queryInterface) {
-    for (const t of ["recently_viewed","support_messages","support_tickets","reviews","notifications","return_requests","coupon_redemptions","order_status_histories","order_items","orders","favorites","cart_items","carts","addresses","product_variants","product_images","products","categories","coupons","users"]) {
-      await queryInterface.bulkDelete(t, null, {});
+    for (const t of ["audit_logs","recently_viewed","support_messages","support_tickets","reviews","notifications","return_requests","coupon_redemptions","order_status_histories","order_items","orders","favorites","cart_items","carts","addresses","product_variants","product_images","products","categories","coupons","auth_session","auth_verification","auth_account","auth_user","users"]) {
+      try { await queryInterface.bulkDelete(t, null, {}); } catch (_e) { /* table peut ne pas exister */ }
     }
   }
 };

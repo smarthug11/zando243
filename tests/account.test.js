@@ -4,17 +4,8 @@ const path = require("path");
 const os = require("os");
 const fs = require("fs");
 
-const dbPath = path.join(os.tmpdir(), `zando243-account-${process.pid}-${Date.now()}.sqlite`);
 
-process.env.NODE_ENV = "test";
-process.env.SQLITE_STORAGE = dbPath;
-process.env.CSRF_ENABLED = "false";
-process.env.DB_LOG = "false";
-process.env.JWT_ACCESS_SECRET = "test_access_secret";
-process.env.JWT_REFRESH_SECRET = "test_refresh_secret";
-process.env.COOKIE_SECRET = "test_cookie_secret";
-process.env.SESSION_SECRET = "test_session_secret";
-
+require("./_setup-test-db");
 const { sequelize, defineModels, hashPassword } = require("../src/models");
 const accountController = require("../src/controllers/accountController");
 const { requireAuth } = require("../src/middlewares/auth");
@@ -123,7 +114,6 @@ test.beforeEach(async () => {
 
 test.after(async () => {
   await sequelize.close();
-  if (fs.existsSync(dbPath)) fs.unlinkSync(dbPath);
 });
 
 test("un utilisateur connecté peut afficher sa page profil avec ses informations, adresses et notifications récentes", async () => {
@@ -185,7 +175,7 @@ test("un utilisateur connecté peut afficher sa page profil avec ses information
   assert.ok(res.rendered.locals.notifications.every((n) => n.userId === alice.id));
 });
 
-test("un utilisateur connecté peut mettre à jour ses informations de profil selon le comportement actuel", async () => {
+test("un utilisateur connecté peut mettre à jour son profil sans modifier son email", async () => {
   const user = await models.User.findByPk(alice.id);
   const req = createReq({
     user,
@@ -208,9 +198,17 @@ test("un utilisateur connecté peut mettre à jour ses informations de profil se
   const updatedUser = await models.User.findByPk(alice.id);
   assert.equal(updatedUser.firstName, "Alicia");
   assert.equal(updatedUser.lastName, "Updated");
-  assert.equal(updatedUser.email, "alicia@example.com");
+  assert.equal(updatedUser.email, "alice@example.com");
   assert.equal(updatedUser.phone, null);
   assert.equal(updatedUser.avatarUrl, null);
+});
+
+test("le champ email profil est readonly dans la vue", () => {
+  const view = fs.readFileSync(path.join(__dirname, "../src/views/pages/account/profile.ejs"), "utf8");
+
+  assert.ok(view.includes('name="email"'));
+  assert.ok(view.includes("readonly"));
+  assert.ok(view.includes('aria-readonly="true"'));
 });
 
 test("un utilisateur connecté peut créer une adresse et definir la nouvelle comme adresse par défaut", async () => {

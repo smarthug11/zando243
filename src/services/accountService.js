@@ -33,7 +33,6 @@ async function updateUserProfile(user, payload) {
   Object.assign(user, {
     firstName: payload.firstName,
     lastName: payload.lastName,
-    email: payload.email.toLowerCase(),
     phone: payload.phone || null,
     avatarUrl: parseHttpsUrl(payload.avatarUrl)
   });

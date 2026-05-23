@@ -1,19 +1,11 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("fs");
 const path = require("path");
 const os = require("os");
 
-const dbPath = path.join(os.tmpdir(), `zando243-cart-${process.pid}-${Date.now()}.sqlite`);
 
-process.env.NODE_ENV = "test";
-process.env.SQLITE_STORAGE = dbPath;
-process.env.CSRF_ENABLED = "false";
-process.env.DB_LOG = "false";
-process.env.JWT_ACCESS_SECRET = "test_access_secret";
-process.env.JWT_REFRESH_SECRET = "test_refresh_secret";
-process.env.COOKIE_SECRET = "test_cookie_secret";
-process.env.SESSION_SECRET = "test_session_secret";
-
+require("./_setup-test-db");
 const { sequelize, defineModels, hashPassword } = require("../src/models");
 const cartController = require("../src/controllers/cartController");
 const cartRoutes = require("../src/routes/cartRoutes");
@@ -167,6 +159,7 @@ test("les routes panier hors checkout exposent les méthodes attendues", () => {
   assert.deepEqual(routeMethods("/items/:id"), ["delete", "patch", "post"]);
   assert.deepEqual(routeMethods("/items/:id/delete"), ["post"]);
   assert.deepEqual(routeMethods("/items/:id/save-for-later"), ["post"]);
+  assert.deepEqual(routeMethods("/items/:id/move-to-cart"), ["post"]);
 });
 
 // ── showCart ──────────────────────────────────────────────────────────────────
@@ -301,15 +294,96 @@ test("ajout produit avec variantId inconnu renvoie une erreur contrôlée", asyn
   assert.equal(res.statusCode, 404);
 });
 
-test("addCartItem redirige vers /cart si redirectTo=cart", async () => {
+test("ajout produit avec variante sans stock refuse le panier", async () => {
+  const variant = await models.ProductVariant.create({
+    productId: activeProduct.id,
+    name: "Taille M",
+    stock: 0
+  });
   const req = createReq({
     user: customerUser,
     method: "POST",
-    body: { productId: activeProduct.id, qty: 1, redirectTo: "cart" }
+    body: { productId: activeProduct.id, variantId: variant.id, qty: 1 }
+  });
+  const { res, nextError } = await runHandler(cartController.addCartItem, req);
+
+  assert.ok(nextError);
+  errorHandler(nextError, req, res);
+  assert.equal(res.statusCode, 400);
+  assert.equal(nextError.code, "OUT_OF_STOCK");
+  assert.equal(await models.CartItem.count(), 0);
+});
+
+test("addCartItem redirige vers /cart si redirectTo interne vaut /cart", async () => {
+  const req = createReq({
+    user: customerUser,
+    method: "POST",
+    body: { productId: activeProduct.id, qty: 1, redirectTo: "/cart" }
   });
   const { res } = await runHandler(cartController.addCartItem, req);
 
   assert.equal(res.redirectTo, "/cart");
+});
+
+test("addCartItem revient sur la page produits paginée via redirectTo sécurisé", async () => {
+  const req = createReq({
+    user: customerUser,
+    method: "POST",
+    body: { productId: activeProduct.id, qty: 1, redirectTo: "/products?page=2" }
+  });
+  const { res, nextError } = await runHandler(cartController.addCartItem, req);
+
+  assert.equal(nextError, null);
+  assert.equal(res.redirectTo, "/products?page=2");
+});
+
+test("addCartItem revient sur la recherche via redirectTo sécurisé", async () => {
+  const req = createReq({
+    user: customerUser,
+    method: "POST",
+    body: { productId: activeProduct.id, qty: 1, redirectTo: "/search?q=chemise&page=2" }
+  });
+  const { res, nextError } = await runHandler(cartController.addCartItem, req);
+
+  assert.equal(nextError, null);
+  assert.equal(res.redirectTo, "/search?q=chemise&page=2");
+});
+
+test("addCartItem ignore un redirectTo externe", async () => {
+  const req = createReq({
+    user: customerUser,
+    method: "POST",
+    body: { productId: activeProduct.id, qty: 1, redirectTo: "https://evil.com" }
+  });
+  const { res, nextError } = await runHandler(cartController.addCartItem, req);
+
+  assert.equal(nextError, null);
+  assert.equal(res.redirectTo, "/products");
+});
+
+test("addCartItem ignore un redirectTo protocole-relative", async () => {
+  const req = createReq({
+    user: customerUser,
+    method: "POST",
+    body: { productId: activeProduct.id, qty: 1, redirectTo: "//evil.com" }
+  });
+  const { res, nextError } = await runHandler(cartController.addCartItem, req);
+
+  assert.equal(nextError, null);
+  assert.equal(res.redirectTo, "/products");
+});
+
+test("les formulaires add-to-cart SSR incluent redirectTo=currentUrl", () => {
+  const viewPaths = [
+    "../src/views/pages/home.ejs",
+    "../src/views/pages/products/list.ejs",
+    "../src/views/pages/products/detail.ejs"
+  ];
+
+  for (const viewPath of viewPaths) {
+    const view = fs.readFileSync(path.join(__dirname, viewPath), "utf8");
+    assert.ok(view.includes('name="redirectTo" value="<%= currentUrl %>"'), `${viewPath} doit garder currentUrl`);
+  }
 });
 
 test("ajout d'un produit inexistant propage une erreur selon le comportement actuel", async () => {
@@ -349,6 +423,23 @@ test("POST /items refuse une quantité invalide via les validateurs de route", a
   const { nextError } = await runMiddlewareChain(cartController.cartItemValidators, req, res);
 
   assert.ok(nextError);
+  errorHandler(nextError, req, res);
+  assert.equal(res.statusCode, 422);
+});
+
+test("POST /items/:id refuse une quantité invalide via les validateurs de route", async () => {
+  const req = createReq({
+    user: customerUser,
+    method: "POST",
+    params: { id: "11111111-1111-4111-8111-111111111111" },
+    body: { qty: "100" }
+  });
+  const res = createRes();
+
+  const { nextError } = await runMiddlewareChain(cartController.cartItemUpdateValidators, req, res);
+
+  assert.ok(nextError);
+  assert.equal(nextError.message, "La quantité doit être un entier entre 1 et 99.");
   errorHandler(nextError, req, res);
   assert.equal(res.statusCode, 422);
 });
@@ -484,6 +575,56 @@ test("save-for-later sur un item étranger propage une erreur selon le comportem
   assert.ok(nextError);
   errorHandler(nextError, req, res);
   assert.equal(res.statusCode, 404);
+});
+
+test("un item savedForLater affiche l'action Remettre au panier dans la vue", () => {
+  const view = fs.readFileSync(path.join(__dirname, "../src/views/pages/cart.ejs"), "utf8");
+
+  assert.ok(view.includes("Remettre au panier"));
+  assert.ok(view.includes("/cart/items/<%= item.id %>/move-to-cart"));
+});
+
+test("remettre au panier passe savedForLater=false et recompte l'item", async () => {
+  const req = createReq({ user: customerUser });
+  const cart = await cartService.getOrCreateCart(req);
+  const item = await models.CartItem.create({ cartId: cart.id, productId: activeProduct.id, qty: 2, savedForLater: true });
+
+  const moveReq = createReq({
+    user: customerUser,
+    method: "POST",
+    params: { id: item.id }
+  });
+  const { res, nextError } = await runHandler(cartController.moveSavedItemToCart, moveReq);
+
+  assert.equal(nextError, null);
+  assert.equal(res.redirectTo, "/cart");
+  await item.reload();
+  assert.equal(item.savedForLater, false);
+
+  const loadedCart = await cartService.loadCart(req);
+  const totals = cartService.computeCartTotals(loadedCart);
+  assert.equal(totals.subtotal, 50);
+  assert.equal(await cartService.getCartItemCount(req), 2);
+});
+
+test("un utilisateur ne peut pas remettre au panier l'item sauvegardé d'un autre", async () => {
+  const otherReq = createReq({ user: otherUser });
+  const otherCart = await cartService.getOrCreateCart(otherReq);
+  const foreignItem = await models.CartItem.create({ cartId: otherCart.id, productId: activeProduct.id, qty: 1, savedForLater: true });
+
+  const req = createReq({
+    user: customerUser,
+    method: "POST",
+    params: { id: foreignItem.id }
+  });
+  const res = createRes();
+  const { nextError } = await runHandler(cartController.moveSavedItemToCart, req, res);
+
+  assert.ok(nextError);
+  errorHandler(nextError, req, res);
+  assert.equal(res.statusCode, 404);
+  await foreignItem.reload();
+  assert.equal(foreignItem.savedForLater, true);
 });
 
 // ── computeCartTotals ─────────────────────────────────────────────────────────

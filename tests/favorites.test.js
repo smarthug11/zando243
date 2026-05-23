@@ -4,17 +4,8 @@ const path = require("path");
 const os = require("os");
 const fs = require("fs");
 
-const dbPath = path.join(os.tmpdir(), `zando243-favorites-${process.pid}-${Date.now()}.sqlite`);
 
-process.env.NODE_ENV = "test";
-process.env.SQLITE_STORAGE = dbPath;
-process.env.CSRF_ENABLED = "false";
-process.env.DB_LOG = "false";
-process.env.JWT_ACCESS_SECRET = "test_access_secret";
-process.env.JWT_REFRESH_SECRET = "test_refresh_secret";
-process.env.COOKIE_SECRET = "test_cookie_secret";
-process.env.SESSION_SECRET = "test_session_secret";
-
+require("./_setup-test-db");
 const { sequelize, defineModels, hashPassword } = require("../src/models");
 const favoriteController = require("../src/controllers/favoriteController");
 const { requireAuth } = require("../src/middlewares/auth");
@@ -171,7 +162,6 @@ test.beforeEach(async () => {
 
 test.after(async () => {
   await sequelize.close();
-  if (fs.existsSync(dbPath)) fs.unlinkSync(dbPath);
 });
 
 test("un utilisateur connecté peut afficher sa page favoris", async () => {
@@ -328,4 +318,36 @@ test("un visiteur non connecté est bloqué selon le comportement actuel", async
   assert.equal(postRes.statusCode, 401);
   assert.equal(postRes.rendered.view, "pages/errors/error");
   assert.match(postRes.rendered.locals.error.message, /Authentification requise/);
+});
+
+test("GET /favorites en invité HTML redirige vers login avec flash", async () => {
+  const req = createReq({ user: null, method: "GET", originalUrl: "/favorites", headers: { accept: "text/html" } });
+  const res = createRes();
+
+  const { nextError } = await runHandler(requireAuth, req, res);
+
+  assert.equal(nextError, null);
+  assert.equal(res.redirectTo, "/auth2/login");
+  assert.deepEqual(req.session.flash, { type: "error", message: "Connectez-vous pour continuer." });
+});
+
+test("requête API/JSON protégée garde une réponse 401 JSON", async () => {
+  const req = createReq({
+    user: null,
+    method: "GET",
+    originalUrl: "/api/favorites",
+    path: "/api/favorites",
+    headers: { accept: "application/json" },
+    accepts(type) {
+      return type === "json";
+    }
+  });
+  const res = createRes();
+
+  const { nextError } = await runHandler(requireAuth, req, res);
+
+  assert.ok(nextError);
+  errorHandler(nextError, req, res);
+  assert.equal(res.statusCode, 401);
+  assert.equal(res.jsonPayload.error.code, "AUTH_REQUIRED");
 });

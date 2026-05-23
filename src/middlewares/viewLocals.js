@@ -5,6 +5,7 @@ async function attachViewLocals(req, res, next) {
   try {
     res.locals.app = { name: env.appName, url: env.appUrl };
     res.locals.currentPath = req.path;
+    res.locals.currentUrl = req.originalUrl || req.url || req.path;
     res.locals.requestId = req.requestId;
     res.locals.flash = req.session.flash || null;
     res.locals.auth = { user: req.user || null };

@@ -1,5 +1,6 @@
 const { sequelize, defineModels } = require("../models");
-const { computeCartTotals, loadCart } = require("./cartService");
+const { randomInt } = require("crypto");
+const { loadCart } = require("./cartService");
 const { validateCoupon, recordCouponRedemption } = require("./promoService");
 const { generateInvoicePdf } = require("./invoiceService");
 const { applyDeliveredOrderEffects } = require("./loyaltyService");
@@ -16,11 +17,11 @@ defineModels();
 async function generateUniqueOrderNumber(transaction) {
   const models = defineModels();
   for (let i = 0; i < 10; i += 1) {
-    const candidate = `ORD-${new Date().getFullYear()}-${String(Math.floor(10000 + Math.random() * 90000))}`;
+    const candidate = `ORD-${new Date().getFullYear()}-${String(randomInt(10000, 100000))}`;
     const exists = await models.Order.findOne({ where: { orderNumber: candidate }, attributes: ["id"], transaction });
     if (!exists) return candidate;
   }
-  return `ORD-${new Date().getFullYear()}-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+  return `ORD-${new Date().getFullYear()}-${Date.now()}-${randomInt(0, 10000)}`;
 }
 
 function generateTrackingNumberCandidate({ doorDelivery = false } = {}) {
@@ -28,7 +29,7 @@ function generateTrackingNumberCandidate({ doorDelivery = false } = {}) {
   const y = now.getFullYear();
   const m = String(now.getMonth() + 1).padStart(2, "0");
   const d = String(now.getDate()).padStart(2, "0");
-  const rand = String(Math.floor(100000 + Math.random() * 900000));
+  const rand = String(randomInt(100000, 1000000));
   const mode = doorDelivery ? "D" : "R"; // D = door delivery, R = retrait bureau
   return `ITS-${mode}-${y}${m}${d}-${rand}`;
 }
@@ -45,7 +46,7 @@ async function generateUniqueTrackingNumber({ doorDelivery = false, transaction 
     if (!exists) return candidate;
   }
   // Fallback ultra-peu probable si collisions répétées
-  const fallback = `ITS-${doorDelivery ? "D" : "R"}-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+  const fallback = `ITS-${doorDelivery ? "D" : "R"}-${Date.now()}-${randomInt(0, 10000)}`;
   return fallback;
 }
 
@@ -64,43 +65,120 @@ function getPickupOfficeAddress() {
   return { ...env.pickupOfficeAddress };
 }
 
-async function createOrderFromCart(req, { paymentMethod, couponCode, doorDelivery = false, addressId = null }) {
+async function clearActiveCartItemsForUser(userId) {
+  const models = defineModels();
+  const cart = await models.Cart.findOne({ where: { userId }, attributes: ["id"] });
+  if (!cart) return 0;
+  return models.CartItem.destroy({ where: { cartId: cart.id, savedForLater: false } });
+}
+
+async function createOrderFromCart(req, { paymentMethod, couponCode, doorDelivery = false, addressId = null, clearCartItems = true }) {
   const models = defineModels();
   if (!req.user) throw new AppError("Authentification requise", 401, "AUTH_REQUIRED");
   if (!req.user.emailVerifiedAt) {
     throw new AppError("Veuillez vérifier votre adresse email avant de passer commande.", 403, "EMAIL_NOT_VERIFIED");
   }
   const cart = await loadCart(req);
-  const items = (cart?.items || []).filter((i) => !i.savedForLater);
-  if (!items.length) throw new AppError("Panier vide", 400, "EMPTY_CART");
+  const preloadedItems = (cart?.items || []).filter((i) => !i.savedForLater);
+  if (!preloadedItems.length) throw new AppError("Panier vide", 400, "EMPTY_CART");
   const address = doorDelivery ? await getUserAddressById(req.user.id, addressId) : getPickupOfficeAddress();
   if (!address) throw new AppError("Adresse requise pour commander", 400, "ADDRESS_REQUIRED");
 
-  const baseTotals = computeCartTotals(cart);
-
   const order = await sequelize.transaction(async (transaction) => {
-    for (const item of items) {
-      if (item.product.stock < item.qty) throw new AppError(`Stock insuffisant pour ${item.product.name}`, 400, "OUT_OF_STOCK");
-    }
-    const { coupon: effectiveCoupon, discountAmount: effectiveDiscount } = await validateCoupon({
-      code: couponCode,
-      userId: req.user.id,
-      subtotal: baseTotals.subtotal,
+    const productLockOptions = sequelize.getDialect() === "postgres" ? { lock: transaction.LOCK.UPDATE } : {};
+    const lockedCartItems = await models.CartItem.findAll({
+      where: { cartId: cart.id, savedForLater: false },
+      include: [
+        { model: models.Product, as: "product", required: true },
+        { model: models.ProductVariant, as: "variant", required: false }
+      ],
+      order: [["createdAt", "DESC"]],
       transaction
     });
-    const shippingFee = doorDelivery ? 5 : 0;
+
+    if (!lockedCartItems.length) throw new AppError("Panier vide", 400, "EMPTY_CART");
+
+    const activeQtyByProductId = new Map();
+    const stockQtyByProductId = new Map();
+    const stockQtyByVariantId = new Map();
+    const productIdByVariantId = new Map();
+    for (const item of lockedCartItems) {
+      const itemQty = Number(item.qty || 0);
+      activeQtyByProductId.set(item.productId, (activeQtyByProductId.get(item.productId) || 0) + itemQty);
+      if (item.variantId) {
+        stockQtyByVariantId.set(item.variantId, (stockQtyByVariantId.get(item.variantId) || 0) + itemQty);
+        productIdByVariantId.set(item.variantId, item.productId);
+      } else {
+        stockQtyByProductId.set(item.productId, (stockQtyByProductId.get(item.productId) || 0) + itemQty);
+      }
+    }
+
+    const productIds = Array.from(activeQtyByProductId.keys()).sort();
+    const lockedProducts = await models.Product.findAll({
+      where: { id: productIds },
+      transaction,
+      ...productLockOptions
+    });
+    const productsById = new Map(lockedProducts.map((product) => [product.id, product]));
+
+    for (const productId of productIds) {
+      const product = productsById.get(productId);
+      if (!product || product.status !== "ACTIVE") {
+        throw new AppError("Produit indisponible", 400, "PRODUCT_UNAVAILABLE");
+      }
+      const requestedQty = stockQtyByProductId.get(productId) || 0;
+      if (Number(product.stock) < requestedQty) {
+        throw new AppError(`Stock insuffisant pour ${product.name}`, 400, "OUT_OF_STOCK");
+      }
+    }
+
+    const variantIds = Array.from(stockQtyByVariantId.keys()).sort();
+    const lockedVariants = variantIds.length
+      ? await models.ProductVariant.findAll({
+          where: { id: variantIds },
+          transaction,
+          ...productLockOptions
+        })
+      : [];
+    const variantsById = new Map(lockedVariants.map((variant) => [variant.id, variant]));
+
+    for (const variantId of variantIds) {
+      const variant = variantsById.get(variantId);
+      if (!variant || variant.productId !== productIdByVariantId.get(variantId)) {
+        throw new AppError("Variante indisponible", 400, "VARIANT_UNAVAILABLE");
+      }
+      const requestedQty = stockQtyByVariantId.get(variantId);
+      if (Number(variant.stock) < requestedQty) {
+        throw new AppError(`Stock insuffisant pour ${variant.name}`, 400, "OUT_OF_STOCK");
+      }
+    }
+
+    const checkoutItems = lockedCartItems.map((item) => ({
+      item,
+      product: productsById.get(item.productId),
+      variant: item.variantId ? variantsById.get(item.variantId) : null
+    }));
+
     const subtotal = round2(
-      items.reduce(
-        (sum, item) =>
+      checkoutItems.reduce(
+        (sum, { item, product }) =>
           sum +
           computeCheckoutLineTotal({
-            priceWithoutDelivery: Number(item.product.priceWithoutDelivery),
-            weightKg: Number(item.product.weightKg),
+            priceWithoutDelivery: Number(product.priceWithoutDelivery),
+            weightKg: Number(product.weightKg),
             qty: item.qty
           }),
         0
       )
     );
+
+    const { coupon: effectiveCoupon, discountAmount: effectiveDiscount } = await validateCoupon({
+      code: couponCode,
+      userId: req.user.id,
+      subtotal,
+      transaction
+    });
+    const shippingFee = doorDelivery ? 5 : 0;
     const total = round2(Math.max(0, subtotal + shippingFee - effectiveDiscount));
     const trackingNumber = await generateUniqueTrackingNumber({ doorDelivery, transaction });
     const orderNumber = await generateUniqueOrderNumber(transaction);
@@ -132,11 +210,11 @@ async function createOrderFromCart(req, { paymentMethod, couponCode, doorDeliver
       { transaction }
     );
 
-    for (const item of items) {
-      const unitPrice = Number(item.product.priceWithoutDelivery);
+    for (const { item, product, variant } of checkoutItems) {
+      const unitPrice = Number(product.priceWithoutDelivery);
       const lineTotal = computeCheckoutLineTotal({
         priceWithoutDelivery: unitPrice,
-        weightKg: Number(item.product.weightKg),
+        weightKg: Number(product.weightKg),
         qty: item.qty
       });
       await models.OrderItem.create(
@@ -144,11 +222,20 @@ async function createOrderFromCart(req, { paymentMethod, couponCode, doorDeliver
           orderId: created.id,
           productId: item.productId,
           productSnapshot: {
-            name: item.product.name,
-            sku: item.product.sku,
-            weightKg: Number(item.product.weightKg),
+            name: product.name,
+            sku: product.sku,
+            weightKg: Number(product.weightKg),
             priceWithoutDelivery: unitPrice,
-            finalPrice: Number(item.product.finalPrice)
+            finalPrice: Number(product.finalPrice),
+            variant: variant
+              ? {
+                  id: variant.id,
+                  name: variant.name,
+                  color: variant.color,
+                  size: variant.size,
+                  sku: variant.sku
+                }
+              : null
           },
           unitPrice,
           qty: item.qty,
@@ -156,9 +243,16 @@ async function createOrderFromCart(req, { paymentMethod, couponCode, doorDeliver
         },
         { transaction }
       );
+    }
 
-      await models.Product.decrement({ stock: item.qty }, { where: { id: item.productId }, transaction });
-      await models.Product.increment({ popularityScore: item.qty }, { where: { id: item.productId }, transaction });
+    for (const [productId, qty] of stockQtyByProductId) {
+      await models.Product.decrement({ stock: qty }, { where: { id: productId }, transaction });
+    }
+    for (const [variantId, qty] of stockQtyByVariantId) {
+      await models.ProductVariant.decrement({ stock: qty }, { where: { id: variantId }, transaction });
+    }
+    for (const [productId, qty] of activeQtyByProductId) {
+      await models.Product.increment({ popularityScore: qty }, { where: { id: productId }, transaction });
     }
 
     await models.OrderStatusHistory.create(
@@ -170,7 +264,9 @@ async function createOrderFromCart(req, { paymentMethod, couponCode, doorDeliver
       await recordCouponRedemption({ couponId: effectiveCoupon.id, userId: req.user.id, orderId: created.id, transaction });
     }
 
-    await models.CartItem.destroy({ where: { cartId: cart.id, savedForLater: false }, transaction });
+    if (clearCartItems) {
+      await models.CartItem.destroy({ where: { cartId: cart.id, savedForLater: false }, transaction });
+    }
     await models.Notification.create(
       { userId: req.user.id, type: "ORDER_CREATED", message: `Commande ${created.orderNumber} créée.` },
       { transaction }
@@ -289,6 +385,7 @@ async function updateOrderStatus(orderId, status, note = null) {
 
 module.exports = {
   createOrderFromCart,
+  clearActiveCartItemsForUser,
   listUserOrders,
   getUserOrder,
   requestReturn,
