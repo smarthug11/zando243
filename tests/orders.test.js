@@ -368,6 +368,46 @@ test("demande de retour utilise le motif par défaut si le body est vide", async
   assert.equal(request.reason, "Demande client");
 });
 
+test("demande de retour est refusée pour une commande Cancelled (sécurité statut)", async () => {
+  const order = await createOrder(customerUser.id, { orderNumber: "RETURN-CANCELLED", status: "Cancelled" });
+  const req = createReq({
+    user: customerUser,
+    method: "POST",
+    params: { id: order.id },
+    body: { reason: "Test retour sur commande annulée" },
+    originalUrl: `/orders/${order.id}/return-request`
+  });
+  const res = createRes();
+
+  const { nextError } = await runHandler(orderController.returnRequest, req, res);
+
+  assert.ok(nextError);
+  assert.equal(nextError.code, "RETURN_NOT_ALLOWED_STATUS");
+  errorHandler(nextError, req, res);
+  assert.equal(res.statusCode, 400);
+  assert.equal(await models.ReturnRequest.count({ where: { orderId: order.id } }), 0);
+});
+
+test("demande de retour est refusée pour une commande Refunded (sécurité statut)", async () => {
+  const order = await createOrder(customerUser.id, { orderNumber: "RETURN-REFUNDED", status: "Refunded" });
+  const req = createReq({
+    user: customerUser,
+    method: "POST",
+    params: { id: order.id },
+    body: { reason: "Test retour sur commande remboursée" },
+    originalUrl: `/orders/${order.id}/return-request`
+  });
+  const res = createRes();
+
+  const { nextError } = await runHandler(orderController.returnRequest, req, res);
+
+  assert.ok(nextError);
+  assert.equal(nextError.code, "RETURN_NOT_ALLOWED_STATUS");
+  errorHandler(nextError, req, res);
+  assert.equal(res.statusCode, 400);
+  assert.equal(await models.ReturnRequest.count({ where: { orderId: order.id } }), 0);
+});
+
 test("demande de retour est refusée pour une commande Delivered selon le comportement actuel", async () => {
   const order = await createOrder(customerUser.id, { orderNumber: "RETURN-NO", status: "Delivered" });
   const req = createReq({

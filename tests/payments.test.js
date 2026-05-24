@@ -269,6 +269,35 @@ test("SDK capture-order déjà payée ne rappelle pas PayPal", async () => {
   assert.equal(calls.length, 0);
 });
 
+test("return PayPal refuse de capturer si le token n'appartient à aucune commande de l'utilisateur (sécurité ownership)", async () => {
+  // Commande appartenant à un AUTRE utilisateur avec une paymentReference connue
+  await createOrder(otherUser.id, { orderNumber: "PAY-FOREIGN-TOKEN", paymentReference: "PAYPAL-FOREIGN" });
+
+  const calls = [];
+  global.fetch = async (url) => {
+    calls.push(String(url));
+    if (String(url).endsWith("/v1/oauth2/token")) return { ok: true, json: async () => ({ access_token: "test-token" }) };
+    if (String(url).includes("/capture")) {
+      throw new Error("captureCheckoutOrder NE DOIT PAS être appelé pour un token étranger");
+    }
+    throw new Error(`Unexpected fetch ${url}`);
+  };
+
+  const req = createReq({
+    user: customerUser,
+    query: { token: "PAYPAL-FOREIGN" },
+    originalUrl: "/payments/paypal/return"
+  });
+
+  const { res, nextError } = await runHandler(paymentController.paypalReturn, req);
+
+  assert.equal(nextError, null);
+  assert.equal(res.redirectTo, "/orders");
+  assert.ok(req.session.flash?.message?.includes("introuvable") || req.session.flash?.message?.includes("appartient"));
+  // L'API PayPal NE DOIT PAS avoir été appelée pour la capture
+  assert.equal(calls.filter((u) => u.includes("/capture")).length, 0);
+});
+
 test("return PayPal capture valide marque la commande payée et redirige vers le détail", async () => {
   const order = await createOrder(customerUser.id, { paymentReference: "PAYPAL-RETURN" });
   global.fetch = async (url) => {

@@ -25,7 +25,14 @@ function requireSecret(name, devFallback) {
   const value = process.env[name];
   if (!value) {
     if (isProd) throw new Error(`Variable d'environnement manquante en production : ${name}`);
+    console.warn(`[security] ${name} non défini — utilisation d'un fallback dev non sécurisé. Générez une valeur avec: openssl rand -hex 32`);
     return devFallback;
+  }
+  const normalized = String(value).toLowerCase();
+  const forbidden = FORBIDDEN_SECRET_FRAGMENTS.find((fragment) => normalized.includes(fragment));
+  const isTestEnv = (process.env.NODE_ENV || "development") === "test";
+  if (!isProd && !isTestEnv && PROD_SECRET_NAMES.has(name) && (String(value).length < 32 || forbidden)) {
+    console.warn(`[security] ${name} est faible (placeholder ou < 32 caractères). Générez une valeur avec: openssl rand -hex 32`);
   }
   validateProductionSecret(name, value);
   return value;

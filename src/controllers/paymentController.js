@@ -70,10 +70,14 @@ const paypalReturn = asyncHandler(async (req, res) => {
     setFlash(req, "error", "Retour PayPal invalide.");
     return res.redirect("/orders");
   }
-  const existing = await models.Order.findOne({ where: { paymentReference: paypalOrderId, userId: req.user.id } });
-  if (existing && existing.paymentStatus === "PAID") {
+  const order = await models.Order.findOne({ where: { paymentReference: paypalOrderId, userId: req.user.id } });
+  if (!order) {
+    setFlash(req, "error", "Commande introuvable ou ce paiement ne vous appartient pas.");
+    return res.redirect("/orders");
+  }
+  if (order.paymentStatus === "PAID") {
     setFlash(req, "success", "Paiement PayPal deja confirme.");
-    return res.redirect(`/orders/${existing.id}`);
+    return res.redirect(`/orders/${order.id}`);
   }
 
   let captured;
@@ -83,15 +87,10 @@ const paypalReturn = asyncHandler(async (req, res) => {
     setFlash(req, "error", "Le paiement PayPal a echoue ou a ete annule.");
     return res.redirect("/orders");
   }
-  const localOrderId = captured?.purchase_units?.[0]?.reference_id || existing?.id;
-  if (!localOrderId) {
-    setFlash(req, "error", "Impossible de rattacher ce paiement a une commande.");
-    return res.redirect("/orders");
-  }
 
-  const order = await models.Order.findOne({ where: { id: localOrderId, userId: req.user.id } });
-  if (!order) {
-    setFlash(req, "error", "Commande introuvable.");
+  const capturedReferenceId = captured?.purchase_units?.[0]?.reference_id;
+  if (capturedReferenceId && capturedReferenceId !== order.id) {
+    setFlash(req, "error", "Incoherence entre le paiement PayPal et la commande.");
     return res.redirect("/orders");
   }
 
@@ -201,7 +200,7 @@ const capturePayPalOrderForSdk = asyncHandler(async (req, res) => {
     return res.json({ ok: true, orderId: order.id, status: "COMPLETED", alreadyPaid: true });
   }
 
-  if (order.paymentReference && order.paymentReference !== paypalOrderId) {
+  if (order.paymentReference !== paypalOrderId) {
     return res.status(400).json({ ok: false, error: "PAYPAL_ORDER_MISMATCH" });
   }
 

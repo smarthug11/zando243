@@ -109,7 +109,12 @@
         const el = document.getElementById(id);
         if (!el) return;
         if (!modal || !body || typeof modal.showModal !== 'function') return;
-        body.innerHTML = `<div class="border rounded-lg p-3 bg-slate-50">${el.innerHTML}</div>`;
+        const wrapper = document.createElement('div');
+        wrapper.className = 'border rounded-lg p-3 bg-slate-50';
+        const clone = el.cloneNode(true);
+        clone.classList.remove('hidden');
+        wrapper.appendChild(clone);
+        body.replaceChildren(wrapper);
         modal.showModal();
       });
     });

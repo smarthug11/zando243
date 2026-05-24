@@ -343,12 +343,17 @@ async function getUserOrder(userId, orderId) {
   });
 }
 
+const RETURN_ALLOWED_STATUSES = new Set(["Pending", "Processing", "Shipped"]);
+
 async function requestReturn(userId, orderId, reason) {
   const models = defineModels();
   const order = await models.Order.findOne({ where: { id: orderId, userId } });
   if (!order) throw new AppError("Commande introuvable", 404, "ORDER_NOT_FOUND");
   if (order.status === "Delivered") {
     throw new AppError("Retour refusé: commande déjà livrée", 400, "RETURN_NOT_ALLOWED_DELIVERED");
+  }
+  if (!RETURN_ALLOWED_STATUSES.has(order.status)) {
+    throw new AppError("Retour refusé: statut de commande non éligible", 400, "RETURN_NOT_ALLOWED_STATUS");
   }
   return models.ReturnRequest.upsert({ orderId, reason, status: "Requested" });
 }
