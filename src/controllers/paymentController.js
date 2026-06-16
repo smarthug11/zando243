@@ -116,6 +116,15 @@ const paypalReturn = asyncHandler(async (req, res) => {
   res.redirect(`/orders/${order.id}`);
 });
 
+// Extrait le montant payé selon le type d'événement :
+// PAYMENT.CAPTURE.COMPLETED -> resource.amount ; CHECKOUT.ORDER.APPROVED -> purchase_units[0].amount
+function extractWebhookAmount(event) {
+  const resource = event?.resource || {};
+  const amount = resource.amount || resource.purchase_units?.[0]?.amount || null;
+  if (!amount || amount.value == null) return null;
+  return { value: Number(amount.value), currency: String(amount.currency_code || "").toUpperCase() };
+}
+
 const paypalWebhook = asyncHandler(async (req, res) => {
   const models = defineModels();
   const signatureOk = await verifyWebhookSignature(req);
@@ -128,6 +137,23 @@ const paypalWebhook = asyncHandler(async (req, res) => {
     if (paypalOrderId) {
       const order = await models.Order.findOne({ where: { paymentReference: paypalOrderId } });
       if (order) {
+        // On ne valide la commande que si le montant payé correspond exactement au total
+        // attendu (devise + valeur). Empêche qu'un paiement falsifié/minoré marque PAID.
+        const paid = extractWebhookAmount(event);
+        const expected = Number(order.total);
+        const amountOk = paid && paid.currency === "USD" && Math.abs(paid.value - expected) < 0.01;
+        if (!amountOk) {
+          await createAuditLog({
+            category: "PAYMENT",
+            level: "WARN",
+            action: "PAYPAL_WEBHOOK_AMOUNT_MISMATCH",
+            message: `Montant webhook PayPal incohérent pour ${order.orderNumber}`,
+            requestId: req.requestId,
+            req,
+            meta: { orderId: order.id, paypalOrderId, expected, paid }
+          });
+          return res.json({ ok: true, ignored: "AMOUNT_MISMATCH" });
+        }
         await markOrderAsPaid(order.id, { provider: "PAYPAL", reference: paypalOrderId });
       }
     }

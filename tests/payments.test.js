@@ -378,7 +378,7 @@ test("webhook valide marque la commande payée sans session", async () => {
       "paypal-auth-algo": "algo",
       "paypal-transmission-sig": "sig"
     },
-    body: { event_type: "PAYMENT.CAPTURE.COMPLETED", resource: { id: "PAYPAL-WEBHOOK-OK" } },
+    body: { event_type: "PAYMENT.CAPTURE.COMPLETED", resource: { id: "PAYPAL-WEBHOOK-OK", amount: { value: "25.00", currency_code: "USD" } } },
     originalUrl: "/payments/paypal/webhook"
   });
 

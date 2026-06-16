@@ -97,7 +97,7 @@ const moveSavedItemToCart = asyncHandler(async (req, res) => {
 const checkout = asyncHandler(async (req, res) => {
   if (!req.user) {
     setFlash(req, "error", "Connectez-vous pour finaliser le paiement. Votre panier invite est conserve.");
-    return res.redirect("/auth/login");
+    return res.redirect("/auth2/login");
   }
   const paypalBackedPayment = isPayPalBackedPayment(req.body.paymentMethod);
   if (paypalBackedPayment && !isPayPalConfigured()) {
@@ -122,7 +122,7 @@ const checkout = asyncHandler(async (req, res) => {
 const createCheckoutAddress = asyncHandler(async (req, res) => {
   if (!req.user) {
     setFlash(req, "error", "Connectez-vous pour ajouter une adresse.");
-    return res.redirect("/auth/login");
+    return res.redirect("/auth2/login");
   }
   await cartService.createCheckoutAddress(req.user.id, req.body);
   setFlash(req, "success", "Adresse ajoutee pour la commande.");

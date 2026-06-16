@@ -4,6 +4,60 @@ Ce fichier sert de contexte rapide sur les changements apportés au projet : ce 
 
 ---
 
+## 16/06/2026 — Durcissement sécurité (ASVS L2), correctifs de flux et mise en place PostgreSQL
+
+### Contexte
+
+Audit de sécurité OWASP ASVS niveau 2 sur le périmètre technique (auth, sessions, contrôle d'accès, injection/XSS, CSRF, logique métier paiement, logging), suivi d'un audit des bugs fonctionnels/flux. Constat clé : les principaux écarts L2 venaient de la migration vers Better Auth (l'ancien échafaudage de sécurité — verrouillage de compte, invalidation de tokens — n'avait pas été re-câblé). Corrections appliquées + base PostgreSQL opérationnelle (dev + test). **Suite complète : 381 tests, 0 échec.**
+
+---
+
+### Sécurité — corrections appliquées
+
+1. **Anti-automation de l'API d'auth** (`src/middlewares/rateLimit.js`, `app.js`) — le rate-limit de connexion ne protégeait que la route SSR `/auth2/login` ; l'endpoint réel `POST /api/auth/sign-in/email` (monté avant les limiteurs) y échappait. Ajout de `betterAuthRateLimit` (aiguilleur 3 seaux par IP : `sign-in` 10/15 min, `sign-up`+`reset` 20/15 min, reste 300/15 min), monté via `app.use("/api/auth", betterAuthRateLimit)`. Indépendant de la version Better Auth.
+
+2. **Traçage des blocages rate-limit** (`rateLimit.js`) — chaque 429 d'auth émet désormais un log pino `AUTH_RATE_LIMIT_BLOCK` (IP, chemin, limiteur) pour pouvoir mesurer la friction réelle avant d'éventuellement ajuster les seuils. Log léger (pas d'écriture DB → pas d'amplification sous attaque).
+
+3. **Anti-énumération à l'inscription** (`src/controllers/auth2Controller.js`) — si l'email existe déjà, la réponse est désormais **identique** à une inscription réussie (flash succès + redirect `/`, sans session). En complément, un email « tentative de création de compte » est envoyé hors-bande au titulaire réel (`emailService.sendExistingAccountNotice`, fire-and-forget pour ne pas créer de différence de timing).
+
+4. **`trustedOrigins` Better Auth dérivé de l'environnement** (`src/auth-be/index.mjs`) — `buildTrustedOrigins()` à partir de `BETTER_AUTH_URL` + `APP_URL` + `ALLOWED_ORIGINS` (repères localhost ajoutés hors production). Nouvelle variable `ALLOWED_ORIGINS` dans `.env.example`.
+
+5. **Webhook PayPal — vérification du montant** (`src/controllers/paymentController.js`) — `extractWebhookAmount` + comparaison stricte montant/devise (USD, écart < 0,01) au total de la commande avant `markOrderAsPaid` ; en cas d'écart : audit `PAYPAL_WEBHOOK_AMOUNT_MISMATCH` et commande non validée.
+
+6. **Contrôle d'accès admin granulaire** — whitelist de statut de commande `ALLOWED_ORDER_STATUSES` (Pending/Processing/Shipped/Delivered/Cancelled/Refunded, 422 sinon) dans `orderService.updateOrderStatus` ; `adminUserService.toggleUserBlock` refuse les comptes non-CUSTOMER (un admin ne peut plus bloquer un autre admin / lui-même).
+
+7. **CSP par nonce** (`app.js` + vues) — retrait de `'unsafe-inline'` sur `script-src`. Middleware de nonce par requête (`res.locals.cspNonce`) avant helmet ; `script-src 'self' 'nonce-…' <CDN>`, `script-src-attr` retiré (→ `'none'`). Nonce ajouté aux 6 `<script>` inline ; les 4 `onclick=` convertis en `data-confirm`/`data-href` + délégation.
+
+8. **Révocation de session au reset de mot de passe** (`src/auth-be/index.mjs`, `hooks.mjs`) — activation de l'option native `emailAndPassword.revokeSessionsOnPasswordReset: true` (Better Auth supprime toutes les sessions de l'utilisateur au reset → éjecte un éventuel attaquant connecté). Retrait de l'`increment("refreshTokenVersion")` devenu mort.
+
+### Politique de mot de passe — évaluée puis simplifiée
+
+Un contrôle anti-fuite **Have I Been Pwned (k-anonymity)** a été ajouté (ASVS V2.1.7) puis **retiré sur décision produit** (friction jugée non souhaitable pour un e-commerce public ; refus d'un feature désactivable par flag). `src/utils/passwordPolicy.js` ne conserve que la **politique locale synchrone** : longueur ≥ 12, limite 72 octets bcrypt, liste noire courte. `hooks.mjs` appelle `validatePasswordPolicy` (sync). **Conséquence assumée : ASVS V2.1.7 non couvert.**
+
+### Bugs fonctionnels — voir `BUGS.md`
+
+- **BUG-1** (🔴 corrigé) — checkout invité redirigé vers `/auth/login` inexistant → `/auth2/login`.
+- **BUG-2** (🔴 corrigé) — points de fidélité recrédités sur `Delivered → Shipped → Delivered` ; désormais idempotent (1ʳᵉ livraison seulement, via comptage `OrderStatusHistory`).
+- **BUG-3** (🔴 réservé) — stock regonflé à chaque annulation : **laissé en l'état**, test manuel utilisateur prévu.
+- **BUG-4 → BUG-15** documentés dans `BUGS.md` (à tester puis corriger).
+
+### Tests réalignés sur le comportement corrigé
+
+`tests/checkout.test.js` et `tests/cart.test.js` (`/auth2/login`), `tests/payments.test.js` (webhook avec montant réaliste), `tests/product-detail-ui.test.js` (extraction `<script nonce>` tolérante aux balises EJS). Aucun masquage : ces tests figeaient l'ancien comportement.
+
+### Infrastructure
+
+Base PostgreSQL `zando243_db` (dev) + `zando243_test` (test, créée par le hook `pretest`) en place. Seed de démo fonctionnel (`npm run seed`).
+
+### Synthèse
+
+- Ajouté : `betterAuthRateLimit` + logging, anti-énumération + email, `revokeSessionsOnPasswordReset`, vérif montant webhook, whitelist statut commande, CSP nonce, `buildTrustedOrigins`, `sendExistingAccountNotice`, variable `ALLOWED_ORIGINS`.
+- Retiré : contrôle HIBP (et flag `PASSWORD_BREACH_CHECK`), `increment("refreshTokenVersion")` mort, fichier temporaire `BUGS_FONCTIONNELS.md` (fusionné dans `BUGS.md`).
+- Corrigé : BUG-1, BUG-2.
+- Tests : 381/381 verts.
+
+---
+
 ## 24/05/2026 — Tests UI, CSRF et Better Auth checkout (documentation retroactive)
 
 ### Contexte

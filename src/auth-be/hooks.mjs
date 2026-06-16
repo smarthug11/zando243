@@ -134,9 +134,10 @@ export const afterHook = createAuthMiddleware(async (ctx) => {
   }
 
   if (ctx.path === "/reset-password") {
+    // La révocation effective des sessions est assurée nativement par Better Auth
+    // (option revokeSessionsOnPasswordReset). Ici on ne fait plus que tracer l'événement.
     const userId = ctx.context?.session?.user?.id || ctx.context?.newSession?.user?.id;
     if (userId) {
-      await models.User.increment("refreshTokenVersion", { where: { id: userId } });
       await createAuditLog({
         category: "AUTH",
         action: "PASSWORD_RESET",

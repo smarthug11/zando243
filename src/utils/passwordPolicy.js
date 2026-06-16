@@ -12,6 +12,7 @@ const WEAK_PASSWORDS = new Set([
   "qwerty123456"
 ]);
 
+// Politique locale synchrone : longueur minimale, limite bcrypt, liste noire courte.
 function validatePasswordPolicy(password) {
   const value = String(password || "");
   const normalized = value.toLowerCase().trim();

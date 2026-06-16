@@ -768,7 +768,7 @@ test("visiteur non connecté est redirigé pour créer une adresse checkout", as
   const { res, nextError } = await runHandler(cartController.createCheckoutAddress, req);
 
   assert.equal(nextError, null);
-  assert.equal(res.redirectTo, "/auth/login");
+  assert.equal(res.redirectTo, "/auth2/login");
   assert.deepEqual(req.session.flash, { type: "error", message: "Connectez-vous pour ajouter une adresse." });
   assert.equal(await models.Address.count(), 0);
 });

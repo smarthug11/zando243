@@ -1,6 +1,6 @@
 # FONCTIONNALITES.md - Etat fonctionnel et technique de Zando243
 
-Derniere mise a jour : 24/05/2026 (Phase 2C-7 a 2C-10 completes : tests deleteProductImage, variantes, orderDetailPage, updateOrder, PDF ; fix filtre date GET /admin/orders ; fix finalPrice non recalcule sur updateProduct — suite : 38 tests admin-orders, 95 tests admin-products, 0 fail)
+Derniere mise a jour : 16/06/2026 (audit OWASP ASVS L2 + corrections securite, retrait du controle HIBP, correctifs de flux BUG-1/BUG-2, mise en place PostgreSQL — details dans update.md ; suite : 381 tests, 0 fail)
 
 Ce document resume ce que fait l'application Zando243, les routes principales, les fichiers responsables, les services metier utilises, les protections en place et l'etat de la refactorisation progressive.
 
@@ -35,7 +35,7 @@ Stack principale :
 
 ## 2. Etat securite
 
-Trois audits de securite ont ete realises (SAST 29/03/2026, SAST V2 25/04/2026, OWASP ASVS L1 26/04/2026). Les rapports sont dans `security-audits/`.
+Les rapports d'audit formels sont dans `security-audits/` (SAST 29/03/2026, SAST V2 25/04/2026, OWASP ASVS L1 26/04/2026). Un audit OWASP ASVS L2 a suivi le 16/06/2026 ; ses corrections sont detaillees dans `update.md` (entree 16/06/2026).
 
 ### Secrets et authentification
 
@@ -43,7 +43,7 @@ Trois audits de securite ont ete realises (SAST 29/03/2026, SAST V2 25/04/2026, 
 - En production, chaque secret doit faire au moins 32 caracteres et ne pas contenir de placeholder (`change_me`, `unsafe`, `secret`) — verifie au demarrage via `validateProductionSecret`.
 - L'authentification est gérée par **Better Auth** (lib maintenue). Les sessions sont stockées en base (`auth_session`) avec un token signé envoyé via le cookie `better-auth.session_token` (`httpOnly`, `sameSite: lax`, `secure` en prod).
 - Les passwords sont hashés par Better Auth (scrypt natif, paramètres par défaut).
-- Le reset password utilise un message neutre pour eviter l'enumeration d'emails.
+- Le reset password et l'inscription utilisent une reponse neutre pour eviter l'enumeration d'emails. A l'inscription, si l'email existe deja, la reponse est identique a un succes et un email de notification est envoye hors-bande au titulaire reel (`emailService.sendExistingAccountNotice`).
 - L'email de vérification est envoyé automatiquement à l'inscription via le hook `sendVerificationEmail` configuré dans `src/auth-be/index.mjs`.
 - Un policy hook BA applique la politique de mot de passe maison (12 chars min, blocklist, ≤72 octets) sur `sign-up` et `reset-password`.
 
@@ -71,11 +71,19 @@ Fichiers concernes :
 
 ### Verrouillage de compte (brute-force)
 
-Better Auth gère le rate limiting des tentatives de connexion via `express-rate-limit` (5 tentatives par fenêtre de 15 min sur `POST /auth2/login`). Les anciennes colonnes `failedLoginAttempts` / `lockedUntil` sur `users` ne sont plus utilisées (legacy JWT) — elles restent en base en attente de cleanup SQL.
+Anti-automation a deux niveaux (par IP, `express-rate-limit`) :
+
+- Routes SSR `/auth2/*` : `loginRateLimit` (5/15 min), `registerRateLimit` (5/h), `resetPasswordRateLimit` (10/h).
+- API Better Auth `/api/auth/*` : `betterAuthRateLimit`, monte directement sur le point de montage (independant de l'ordre des middlewares). Aiguilleur 3 seaux : `sign-in` 10/15 min, `sign-up`/`reset` 20/15 min, reste 300/15 min. Ferme la breche ou l'endpoint reel d'auth (`POST /api/auth/sign-in/email`) echappait aux limiteurs.
+
+Chaque blocage (429) emet un log pino `AUTH_RATE_LIMIT_BLOCK` (IP, chemin, limiteur) pour mesurer la friction reelle avant d'eventuellement ajuster les seuils.
+
+Pas de verrouillage par compte : les anciennes colonnes `failedLoginAttempts` / `lockedUntil` (legacy JWT) ne sont plus utilisees et restent en attente de cleanup SQL.
 
 Fichiers concernes :
 
-- `src/middlewares/rateLimit.js` (`loginRateLimit`)
+- `src/middlewares/rateLimit.js` (`loginRateLimit`, `betterAuthRateLimit`, handler de log)
+- `app.js` (montage `app.use("/api/auth", betterAuthRateLimit)`)
 - `src/routes/auth2Routes.js`
 
 ### Gestion de session
@@ -83,7 +91,7 @@ Fichiers concernes :
 - Les sessions Better Auth sont stockées dans `auth_session` avec un `expiresAt` (7 jours par défaut).
 - La rotation/refresh est gérée automatiquement par Better Auth côté serveur (pas d'endpoint exposé côté client).
 - Le sign-out (`POST /auth2/logout`) appelle l'API Better Auth pour supprimer la ligne en base + purge le cookie navigateur via `clearBaCookies`.
-- Reset password : Better Auth invalide toutes les sessions actives du user automatiquement.
+- Reset password : l'option `emailAndPassword.revokeSessionsOnPasswordReset` est activee → Better Auth supprime toutes les sessions actives du user au reset (ejecte un eventuel attaquant deja connecte).
 
 Fichiers concernes :
 
@@ -104,23 +112,26 @@ Fichiers concernes :
 ### Rate limiting, proxy et CORS
 
 - `trust proxy` est limite a `1`.
-- Le rate limit login est limite a 5 tentatives par 15 minutes.
-- Le rate limit inscription est limite a 5 tentatives par heure (`registerRateLimit`).
-- Le rate limit reset password est limite a 10 tentatives par heure.
-- Les erreurs de rate limit renvoient une structure explicite.
+- Limiteur global : 500 requetes / 15 min par IP (toutes routes).
+- Routes SSR d'auth : login 5/15 min, inscription 5/h (`registerRateLimit`), reset 10/h.
+- API Better Auth `/api/auth/*` : `betterAuthRateLimit` (sign-in 10/15 min, sign-up/reset 20/15 min, reste 300/15 min).
+- Chaque blocage d'auth (429) est trace par un log `AUTH_RATE_LIMIT_BLOCK` (IP, chemin, limiteur).
+- Les erreurs de rate limit renvoient une structure explicite + en-tete `RateLimit-Reset` (secondes restantes).
 - CORS restreint a une liste blanche (`ALLOWED_ORIGINS` ou `appUrl`), plus aucune origine arbitraire acceptee.
 
 Fichiers concernes :
 
 - `app.js`
 - `src/middlewares/rateLimit.js`
-- `src/routes/auth2Routes.js` (rate limits login, register, reset password depuis la migration Better Auth)
+- `src/middlewares/security.js` (limiteur global)
+- `src/routes/auth2Routes.js`
 
 ### Content Security Policy (CSP)
 
-CSP maintenant activee avec directives explicites :
+CSP activee avec directives explicites, **par nonce** sur les scripts (plus de `'unsafe-inline'`) :
 
-- `scriptSrc` : `self`, `unsafe-inline`, `cdn.tailwindcss.com`, `cdn.jsdelivr.net`
+- `scriptSrc` : `self`, `'nonce-<aleatoire par requete>'`, `cdn.tailwindcss.com`, `cdn.jsdelivr.net`
+- `script-src-attr` : `'none'` (plus aucun handler inline `onclick=` autorise)
 - `styleSrc` : `self`, `unsafe-inline`, `fonts.googleapis.com`
 - `fontSrc` : `self`, `fonts.gstatic.com`
 - `imgSrc` : `self`, `data:`, `https:`
@@ -128,11 +139,12 @@ CSP maintenant activee avec directives explicites :
 - `frameAncestors` : `none`
 - `upgradeInsecureRequests` : active en production uniquement
 
-Note : `unsafe-inline` reste necessaire car les templates EJS contiennent du JS inline. A assainir progressivement si un nonce est introduit.
+Un middleware genere `res.locals.cspNonce` (16 octets aleatoires) avant helmet ; chaque `<script>` inline porte `nonce="<%= cspNonce %>"`. Les anciens handlers `onclick=` ont ete convertis en `data-confirm`/`data-href` + delegation d'evenements. `styleSrc` garde `unsafe-inline` (Tailwind injecte du style inline ; risque XSS plus faible).
 
 Fichiers concernes :
 
-- `app.js`
+- `app.js` (middleware nonce + directives helmet)
+- `src/views/**` (6 scripts inline nonce ; `admin/products.ejs`, `admin/dashboard.ejs` pour la delegation)
 
 ### Sessions
 
@@ -177,6 +189,7 @@ Fichiers concernes :
 ### PayPal (corrections securite)
 
 - La validation des webhooks verifie que `cert_url` appartient aux domaines officiels PayPal avant tout appel reseau.
+- Le webhook compare le montant et la devise captures (USD, ecart < 0,01) au total de la commande avant de la marquer payee ; en cas d'ecart, audit `PAYPAL_WEBHOOK_AMOUNT_MISMATCH` et commande non validee (`extractWebhookAmount`).
 - La capture SDK verifie la coherence entre `paypalOrderId` et `order.paymentReference`.
 
 Fichiers concernes :
@@ -390,6 +403,7 @@ Ce que ca fait :
 - politique de mot de passe maison appliquée via `beforeHook` (12 chars min, blocklist, ≤72 octets) ;
 - audit log `AUTH / USER_REGISTER` écrit ;
 - fusion du panier invité dans le panier connecté ;
+- anti-énumération : si l'email existe déjà, la réponse est identique à un succès (flash succès + redirect `/`, sans session) et un email de notification est envoyé hors-bande au titulaire réel (`emailService.sendExistingAccountNotice`) ;
 - rate limit dédié `registerRateLimit` (5/heure).
 
 Fichiers :
@@ -405,7 +419,7 @@ Acces : visiteurs non connectes.
 
 Tests :
 
-- `tests/auth2-http.test.js` (succès, password court refusé, email duplicate refusé)
+- `tests/auth2-http.test.js` (succès, password court refusé, email duplicate indistinguable d'un succès — anti-énumération)
 - `tests/better-auth-service.test.js` (sign-up API, policy, mirror, anti role injection)
 - `tests/better-auth-mirror.test.js` (mirror users + audit log)
 - `tests/better-auth-ssr.test.js` (parcours SSR complet)
@@ -469,7 +483,7 @@ Ce que ca fait :
 - BA crée une ligne `auth_verification` avec un token et envoie l'email via `sendResetPasswordEmail` ;
 - réponse opaque pour éviter l'énumération d'emails (même flash que l'email existe ou non) ;
 - `POST /auth2/reset-password` : appelle `auth.handler('/api/auth/reset-password')` avec le token ;
-- BA vérifie le token, met à jour le hash scrypt dans `auth_account.password`, invalide les sessions actives ;
+- BA vérifie le token, met à jour le hash scrypt dans `auth_account.password`, et **invalide toutes les sessions actives du user** (option `emailAndPassword.revokeSessionsOnPasswordReset` activée → éjecte un éventuel attaquant connecté) ;
 - la politique de mot de passe maison s'applique via `beforeHook` (12 chars min, blocklist, ≤72 octets) ;
 - rate limit dédié `resetPasswordRateLimit` (10/heure).
 
@@ -847,7 +861,7 @@ Ce que ca fait :
 
 - liste toutes les commandes avec filtres (recherche client par nom/email via `escapeLike`, statut, dates) ;
 - affiche le detail commande ;
-- change le statut (restitue le stock si annulation) ;
+- change le statut, restreint a une whitelist (`ALLOWED_ORDER_STATUSES` : Pending/Processing/Shipped/Delivered/Cancelled/Refunded, 422 sinon) ; a la 1re livraison seulement : points fidelite + notification (idempotent via comptage `OrderStatusHistory`) ; restitue le stock si annulation ;
 - exporte PDF brut commande ;
 - exporte etiquette d'expedition.
 
@@ -913,7 +927,7 @@ Tests :
 Ce que ca fait :
 
 - liste les utilisateurs client ;
-- bloque ou debloque un client.
+- bloque ou debloque un client ; l'action est refusee si la cible n'est pas un compte CUSTOMER (un admin ne peut pas bloquer un autre admin ni lui-meme).
 
 Fichiers :
 

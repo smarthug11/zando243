@@ -1,5 +1,6 @@
 require("dotenv").config();
 const path = require("path");
+const crypto = require("crypto");
 const express = require("express");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
@@ -11,6 +12,7 @@ const { initDatabase } = require("./src/models");
 const { requestIdMiddleware } = require("./src/utils/requestId");
 const { applySecurityMiddlewares } = require("./src/middlewares/security");
 const { csrfProtection, exposeCsrfToken } = require("./src/middlewares/csrf");
+const { betterAuthRateLimit } = require("./src/middlewares/rateLimit");
 const { attachViewLocals } = require("./src/middlewares/viewLocals");
 const { loadCurrentUser } = require("./src/middlewares/auth");
 const { registerRoutes } = require("./src/routes");
@@ -29,14 +31,18 @@ app.set("views", path.join(__dirname, "src/views"));
 
 app.use(requestIdMiddleware);
 app.use(pinoHttpLogger);
+// Nonce CSP par requête (doit être défini AVANT helmet pour être lu par la directive).
+app.use((_req, res, next) => {
+  res.locals.cspNonce = crypto.randomBytes(16).toString("base64");
+  next();
+});
 app.use(
   helmet({
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
         baseUri: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.tailwindcss.com", "https://cdn.jsdelivr.net"],
-        scriptSrcAttr: ["'unsafe-inline'"],
+        scriptSrc: ["'self'", (_req, res) => `'nonce-${res.locals.cspNonce}'`, "https://cdn.tailwindcss.com", "https://cdn.jsdelivr.net"],
         styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
         styleSrcAttr: ["'unsafe-inline'"],
         fontSrc: ["'self'", "https://fonts.gstatic.com"],
@@ -67,6 +73,7 @@ function validateContentType(req, _res, next) {
 app.use(validateContentType);
 
 if (env.betterAuthEnabled) {
+  app.use("/api/auth", betterAuthRateLimit);
   app.all("/api/auth/*", async (req, res, next) => {
     try {
       const mod = await getBetterAuthModule();

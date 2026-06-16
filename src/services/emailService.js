@@ -210,6 +210,20 @@ async function sendResetPasswordEmail(toEmail, url) {
   });
 }
 
+async function sendExistingAccountNotice(toEmail) {
+  const loginUrl = escapeHtml(`${env.appUrl}/auth2/login`);
+  const resetUrl = escapeHtml(`${env.appUrl}/auth2/forgot-password`);
+  return sendMail({
+    to: toEmail,
+    subject: `Tentative de création de compte - ${env.appName}`,
+    html: `<p>Bonjour,</p>
+<p>Quelqu'un vient d'essayer de créer un compte ${escapeHtml(env.appName)} avec cette adresse email, mais un compte existe déjà.</p>
+<p>Si c'était vous : vous avez déjà un compte — <a href="${loginUrl}">connectez-vous ici</a>. Mot de passe oublié ? <a href="${resetUrl}">Réinitialisez-le</a>.</p>
+<p>Si ce n'était pas vous, ignorez ce message : aucun nouveau compte n'a été créé et le vôtre n'a pas changé.</p>`,
+    text: `Quelqu'un a tenté de créer un compte avec votre email. Si c'était vous, connectez-vous : ${env.appUrl}/auth2/login (mot de passe oublié : ${env.appUrl}/auth2/forgot-password). Sinon, ignorez ce message.`
+  });
+}
+
 async function sendOrderInvoiceEmail(order, options = {}) {
   const html = renderInvoiceEmailHtml(order);
   const transport = getTransporter();
@@ -244,6 +258,7 @@ module.exports = {
   sendMail,
   sendVerificationEmail,
   sendResetPasswordEmail,
+  sendExistingAccountNotice,
   sendOrderInvoiceEmail,
   renderInvoiceEmailHtml
 };

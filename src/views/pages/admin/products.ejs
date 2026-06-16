@@ -105,7 +105,7 @@
                   <div class="md:col-span-3 flex flex-wrap justify-end gap-2 mt-2">
                     <button type="button" class="btn-secondary product-modal-close" data-target="<%= modalId %>">Annuler</button>
                     <button class="btn-primary" type="submit">Modifier</button>
-                    <button class="rounded-lg px-4 py-2 font-semibold text-white bg-red-600 hover:bg-red-700" type="submit" formaction="/admin/products/<%= p.id %>/delete" onclick="return confirm('Supprimer ce produit ?');">Supprimer</button>
+                    <button class="rounded-lg px-4 py-2 font-semibold text-white bg-red-600 hover:bg-red-700" type="submit" formaction="/admin/products/<%= p.id %>/delete" data-confirm="Supprimer ce produit ?">Supprimer</button>
                   </div>
                 </form>
 
@@ -130,7 +130,7 @@
                                 <input class="form-input" type="number" name="position" value="<%= img.position || 0 %>" placeholder="Pos.">
                                 <label class="text-sm flex items-center gap-2"><input type="checkbox" name="isMain" value="1" <%= img.isMain ? 'checked' : '' %>> Principale</label>
                                 <button class="btn-primary !py-2 !px-3 text-sm" type="submit">Modifier</button>
-                                <button class="rounded-lg px-3 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700" type="submit" formaction="/admin/products/<%= p.id %>/images/<%= img.id %>/delete" onclick="return confirm('Supprimer cette image ?');">Suppr.</button>
+                                <button class="rounded-lg px-3 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700" type="submit" formaction="/admin/products/<%= p.id %>/images/<%= img.id %>/delete" data-confirm="Supprimer cette image ?">Suppr.</button>
                               </div>
                               <select class="form-select" name="variantId">
                                 <option value="">Image générale (aucune variante)</option>
@@ -179,7 +179,7 @@
                           <input class="form-input" type="number" name="stock" value="<%= v.stock || 0 %>" placeholder="Stock">
                           <div class="col-span-2 flex justify-end gap-2">
                             <button class="btn-primary !py-2 !px-3 text-sm" type="submit">Modifier</button>
-                            <button class="rounded-lg px-3 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700" type="submit" formaction="/admin/products/<%= p.id %>/variants/<%= v.id %>/delete" onclick="return confirm('Supprimer cette variante ?');">Suppr.</button>
+                            <button class="rounded-lg px-3 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700" type="submit" formaction="/admin/products/<%= p.id %>/variants/<%= v.id %>/delete" data-confirm="Supprimer cette variante ?">Suppr.</button>
                           </div>
                         </form>
                       <% }) %>
@@ -207,8 +207,17 @@
     </table>
   </div>
 </section></main>
-<script>
+<script nonce="<%= cspNonce %>">
 (function () {
+  // Confirmation de suppression (remplace les anciens onclick="return confirm(...)").
+  document.addEventListener('click', (e) => {
+    const el = e.target.closest('[data-confirm]');
+    if (el && !window.confirm(el.getAttribute('data-confirm'))) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  });
+
   const openers = document.querySelectorAll('.product-modal-open');
   const closers = document.querySelectorAll('.product-modal-close');
 

@@ -7,8 +7,10 @@ const vm = require("vm");
 const detailViewPath = path.join(__dirname, "../src/views/pages/products/detail.ejs");
 
 function extractDetailScript() {
-  const view = fs.readFileSync(detailViewPath, "utf8");
-  const match = view.match(/<script>\s*([\s\S]*?)\s*<\/script>/);
+  // On retire les balises EJS (ex. l'attribut nonce="<%= cspNonce %>") avant de
+  // localiser le <script> : le `%>` contient un `>` qui casserait sinon le match.
+  const view = fs.readFileSync(detailViewPath, "utf8").replace(/<%[\s\S]*?%>/g, "");
+  const match = view.match(/<script[^>]*>\s*([\s\S]*?)\s*<\/script>/);
   assert.ok(match, "product detail script must exist");
   return match[1];
 }

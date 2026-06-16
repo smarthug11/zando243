@@ -358,18 +358,32 @@ async function requestReturn(userId, orderId, reason) {
   return models.ReturnRequest.upsert({ orderId, reason, status: "Requested" });
 }
 
+const ALLOWED_ORDER_STATUSES = new Set(["Pending", "Processing", "Shipped", "Delivered", "Cancelled", "Refunded"]);
+
 async function updateOrderStatus(orderId, status, note = null) {
   const models = defineModels();
+  if (!ALLOWED_ORDER_STATUSES.has(status)) {
+    throw new AppError("Statut de commande invalide", 422, "INVALID_ORDER_STATUS");
+  }
   const order = await models.Order.findByPk(orderId);
   if (!order) throw new AppError("Commande introuvable", 404, "ORDER_NOT_FOUND");
   const prevStatus = order.status;
   order.status = status;
   await order.save();
   await models.OrderStatusHistory.create({ orderId: order.id, status, note });
-  if (status === "Delivered" && prevStatus !== "Delivered") {
-    await sequelize.transaction(async (t) => {
-      await applyDeliveredOrderEffects(order, t);
+  if (status === "Delivered") {
+    // Idempotence : les effets de livraison (points fidélité + notification) ne sont
+    // appliqués qu'à la PREMIÈRE livraison, même si le statut repasse plus tard par
+    // Delivered (ex. Delivered -> Shipped -> Delivered). On s'appuie sur l'historique :
+    // l'entrée Delivered vient d'être créée, donc count === 1 = toute première livraison.
+    const deliveredCount = await models.OrderStatusHistory.count({
+      where: { orderId: order.id, status: "Delivered" }
     });
+    if (deliveredCount === 1) {
+      await sequelize.transaction(async (t) => {
+        await applyDeliveredOrderEffects(order, t);
+      });
+    }
   }
   if (status === "Cancelled") {
     const items = await models.OrderItem.findAll({ where: { orderId: order.id } });
@@ -389,6 +403,7 @@ async function updateOrderStatus(orderId, status, note = null) {
 }
 
 module.exports = {
+  ALLOWED_ORDER_STATUSES,
   createOrderFromCart,
   clearActiveCartItemsForUser,
   listUserOrders,

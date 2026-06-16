@@ -140,12 +140,16 @@ test("POST /auth2/register avec mot de passe trop court redirige vers /auth2/reg
   assert.equal(r.location, "/auth2/register");
 });
 
-test("POST /auth2/register avec email déjà utilisé redirige vers /auth2/register", async () => {
+test("POST /auth2/register avec email déjà utilisé est indistinguable d'un succès (anti-énumération)", async () => {
   const email = uniqueEmail("reg-dup");
   await form("/auth2/register", { firstName: "A", lastName: "B", email, password: "Password123!Dup1" }, buildJar());
-  const r = await form("/auth2/register", { firstName: "C", lastName: "D", email, password: "Password123!Dup2" }, buildJar());
+  const jar = buildJar();
+  const r = await form("/auth2/register", { firstName: "C", lastName: "D", email, password: "Password123!Dup2" }, jar);
+  // Même réponse qu'une inscription réussie : redirection vers "/" ...
   assert.equal(r.status, 302);
-  assert.equal(r.location, "/auth2/register");
+  assert.equal(r.location, "/");
+  // ... mais aucune session ouverte sur le compte existant.
+  assert.ok(!jar.has("better-auth.session_token"), "aucun cookie de session ne doit être posé");
 });
 
 // ============================================================================

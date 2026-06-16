@@ -28,6 +28,30 @@ export function resetAuthForTests() {
   _auth = null;
 }
 
+// Origines de confiance pour la validation CSRF/Origin de Better Auth.
+// Dérivées de l'environnement (jamais codées en dur) : domaine(s) de prod via
+// BETTER_AUTH_URL / APP_URL / ALLOWED_ORIGINS, + repères localhost hors production.
+function buildTrustedOrigins() {
+  const origins = new Set();
+  const addAll = (value) => {
+    if (!value) return;
+    String(value)
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .forEach((o) => origins.add(o));
+  };
+  addAll(process.env.BETTER_AUTH_URL);
+  addAll(process.env.APP_URL);
+  addAll(process.env.ALLOWED_ORIGINS);
+  if (process.env.NODE_ENV !== "production") {
+    ["http://127.0.0.1", "http://localhost", "http://127.0.0.1:3000", "http://localhost:3000"].forEach((o) =>
+      origins.add(o)
+    );
+  }
+  return Array.from(origins);
+}
+
 export function getAuth() {
   if (_auth) return _auth;
 
@@ -41,7 +65,7 @@ export function getAuth() {
     secret: process.env.BETTER_AUTH_SECRET,
     baseURL: process.env.BETTER_AUTH_URL || process.env.APP_URL || "http://localhost:3000",
     logger: { level: process.env.BETTER_AUTH_LOG_LEVEL || "error" },
-    trustedOrigins: ["http://127.0.0.1", "http://localhost"],
+    trustedOrigins: buildTrustedOrigins(),
     advanced: {
       database: { generateId: () => randomUUID() },
       cookiePrefix: "better-auth"
@@ -63,6 +87,10 @@ export function getAuth() {
       minPasswordLength: 12,
       maxPasswordLength: 72,
       requireEmailVerification: false,
+      // Révoque TOUTES les sessions existantes lors d'une réinitialisation de mot de passe :
+      // un reset signifie « compte peut-être compromis » → on éjecte un éventuel attaquant
+      // déjà connecté. Mécanisme natif Better Auth (api/routes/password -> deleteSessions).
+      revokeSessionsOnPasswordReset: true,
       sendResetPassword: async ({ user, url }) => {
         try { await emailService.sendResetPasswordEmail(user.email, url); }
         catch (e) { console.error("[BetterAuth] sendResetPasswordEmail failed:", e?.message); }

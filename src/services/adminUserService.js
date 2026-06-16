@@ -14,10 +14,13 @@ async function listCustomerUsers() {
 async function toggleUserBlock(userId, action) {
   const models = defineModels();
   const user = await models.User.findByPk(userId);
-  if (!user) return null;
+  if (!user) return { error: "NOT_FOUND" };
+  // On ne bloque/débloque que des clients : empêche un admin de désactiver
+  // un autre admin (ou lui-même) via un id forgé.
+  if (user.role !== "CUSTOMER") return { error: "NOT_A_CUSTOMER" };
 
   await user.update({ isActive: action !== "block" });
-  return user;
+  return { user };
 }
 
 module.exports = {

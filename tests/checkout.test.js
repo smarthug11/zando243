@@ -197,7 +197,7 @@ test("checkout controller redirige un visiteur non connect√© vers login sans cr√
   const { res, nextError } = await runHandler(cartController.checkout, req);
 
   assert.equal(nextError, null);
-  assert.equal(res.redirectTo, "/auth/login");
+  assert.equal(res.redirectTo, "/auth2/login");
   assert.deepEqual(req.session.flash, {
     type: "error",
     message: "Connectez-vous pour finaliser le paiement. Votre panier invite est conserve."

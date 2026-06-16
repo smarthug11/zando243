@@ -4,6 +4,7 @@ const { getBetterAuthModule } = require("../utils/betterAuthBridge");
 const { mergeGuestCartIntoUser } = require("../services/cartService");
 const { defineModels } = require("../models");
 const { env } = require("../config/env");
+const emailService = require("../services/emailService");
 
 function clearBaCookies(res) {
   const opts = { path: "/", httpOnly: true, sameSite: "lax", secure: env.isProd };
@@ -71,8 +72,25 @@ const register = asyncHandler(async (req, res) => {
     const payload = await readJsonSafely(response);
 
     if (!response.ok) {
-      const message = payload?.message || "Inscription impossible.";
-      setFlash(req, "error", message);
+      // Anti-énumération (ASVS) : si l'email est déjà utilisé, on répond exactement
+      // comme pour une inscription réussie afin de ne pas révéler l'existence du compte.
+      // Les autres erreurs (mot de passe faible, email invalide…) ne divulguent rien
+      // et restent affichées telles quelles pour aider l'utilisateur légitime.
+      const code = String(payload?.code || "");
+      const message = String(payload?.message || "");
+      const accountAlreadyExists =
+        /USER_ALREADY_EXISTS|EXISTING_EMAIL|ALREADY_REGISTERED/i.test(code) ||
+        /already\s*exist|already\s*registered|existe\s*déjà|déjà\s*utilis|déjà\s*enregistr/i.test(message);
+      if (accountAlreadyExists) {
+        // On prévient le titulaire réel hors-bande (fire-and-forget : ne pas await pour
+        // ne pas créer de différence de timing exploitable côté énumération).
+        emailService
+          .sendExistingAccountNotice(String(req.body.email || "").toLowerCase())
+          .catch(() => {});
+        setFlash(req, "success", "Compte créé. Un email de vérification vous a été envoyé.");
+        return res.redirect("/");
+      }
+      setFlash(req, "error", message || "Inscription impossible.");
       return res.redirect("/auth2/register");
     }
     if (payload?.user?.id) {
